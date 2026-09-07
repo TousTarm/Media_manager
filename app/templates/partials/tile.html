@@ -1,0 +1,30 @@
+{# Dlaždice v mřížce. Bez obrázků — nese ji název a stav jazyků. #}
+<li class="cell" data-name="{{ item.name|lower }}">
+  {% if item.action == 'detail' %}
+    <button class="tile {% if item.unsorted %}tile-todo{% endif %}" type="button"
+            hx-get="/partial/detail?path={{ item.abs_path|urlencode }}"
+            hx-target="#panel" hx-indicator="#spinner">
+  {% elif item.action == 'enter' %}
+    <a class="tile tile-dir" href="/b/{{ item.category }}?path={{ item.rel|urlencode }}"
+       hx-get="/b/{{ item.category }}?path={{ item.rel|urlencode }}"
+       hx-target="#view" hx-swap="outerHTML" hx-push-url="true">
+  {% else %}
+    <div class="tile tile-flat">
+  {% endif %}
+
+      <span class="tile-name"><span>{{ item.name }}</span></span>
+      <span class="tile-foot">
+        {% if item.langs %}
+          {% for lang in item.langs %}<b class="lang">{{ lang|upper }}</b>{% endfor %}
+        {% elif item.action == 'enter' %}
+          <span class="tile-meta">{{ item.episodes }} souborů</span>
+        {% else %}
+          <b class="lang lang-off" title="Nezařazeno">?</b>
+        {% endif %}
+        {% if item.has_override %}<span class="mark" title="Ruční rozhodnutí">M</span>{% endif %}
+      </span>
+
+  {% if item.action == 'detail' %}</button>
+  {% elif item.action == 'enter' %}</a>
+  {% else %}</div>{% endif %}
+</li>

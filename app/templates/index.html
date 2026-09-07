@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Media Manager{% endblock %}
+
+{% block body %}
+<header class="head">
+  <div class="head-row">
+    <span class="head-title">Media Manager</span>
+    <a class="warn {% if not health.problems %}warn-ok{% elif health.failures %}warn-bad{% endif %}"
+       href="/debug" hx-get="/debug" hx-target="#view" hx-swap="outerHTML" hx-push-url="true"
+       title="Diagnostika prostředí">
+      {#- Bez čísla: hlavička počítá jen levné kontroly, /debug i síťové,
+          takže by se dvě různá čísla přetahovala. -#}
+      {%- if health.failures %}chyba
+      {%- elif health.problems %}varování
+      {%- else %}vše ok{% endif -%}
+    </a>
+  </div>
+  <nav class="tabs">
+    {% for tab in TABS %}
+      <a class="tab {% if tab.key == active %}on{% endif %}" href="{{ tab.href }}"
+         hx-get="{{ tab.href }}" hx-target="#view" hx-swap="outerHTML" hx-push-url="true">{{ tab.label }}</a>
+    {% endfor %}
+  </nav>
+</header>
+
+<main class="main">
+  {% if active == 'auto' %}{% include "partials/view_auto.html" %}
+  {% elif active == 'debug' %}{% include "partials/view_debug.html" %}
+  {% else %}{% include "partials/view_browse.html" %}{% endif %}
+</main>
+
+<nav class="bar">
+  {% for tab in TABS %}
+    <a class="bar-item {% if tab.key == active %}on{% endif %}" href="{{ tab.href }}"
+       hx-get="{{ tab.href }}" hx-target="#view" hx-swap="outerHTML" hx-push-url="true">{{ tab.label }}</a>
+  {% endfor %}
+</nav>
+
+<div id="panel"></div>
+<div id="modal"></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="spinner" aria-hidden="true"></div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{# Fronta na kontrolu: vše, co ještě nemá ruční rozhodnutí. #}
+<div id="view" hx-get="/auto" hx-trigger="library-changed from:body"
+     hx-target="this" hx-swap="outerHTML">
+
+  <div class="tools">
+    <input class="find" type="search" placeholder="Hledat" aria-label="Hledat"
+           autocomplete="off" spellcheck="false" oninput="filterView(this.value)">
+    <span class="count">{{ items|length }}</span>
+  </div>
+
+  <p class="lead">
+    Zařadil sorter, nikdo to zatím nepotvrdil. Zkontroluj jazyk, uprav přepínače
+    a dej <b>Potvrdit</b> — tím se rozhodnutí uzamkne a cron ho už nepřepíše.
+  </p>
+
+  {% if not items %}
+    <p class="none">Všechno je potvrzené.</p>
+  {% endif %}
+
+  <ul class="rows" id="results">
+    {% for item in items %}
+      <li class="cell" data-name="{{ item.name|lower }}">
+        <form class="review {% if item.unsorted %}review-todo{% endif %}"
+              hx-post="/partial/auto/set" hx-target="closest .cell"
+              hx-swap="outerHTML" hx-indicator="#spinner">
+          <input type="hidden" name="path" value="{{ item.abs_path }}">
+
+          <div class="review-head">
+            <button class="review-name" type="button"
+                    hx-get="/partial/detail?path={{ item.abs_path|urlencode }}"
+                    hx-target="#panel" hx-indicator="#spinner">{{ item.name }}</button>
+            <span class="review-cat">{{ item.category }}</span>
+          </div>
+
+          <div class="review-info">
+            <span>audio:
+              {% if item.probe_langs %}<code>{{ item.probe_langs|join(', ') }}</code>
+              {% else %}<code>nezměřeno</code>{% endif %}
+            </span>
+            {% if item.auto_langs and item.auto_langs != item.langs %}
+              <span class="mismatch">ffprobe říká {{ item.auto_langs|join('+')|upper }}</span>
+            {% endif %}
+          </div>
+
+          <div class="review-act">
+            <div class="seg">
+              {% for lang in LANGS %}
+                <label class="seg-item">
+                  <input type="checkbox" name="targets" value="{{ lang }}"
+                         {% if lang in item.langs %}checked{% endif %}>
+                  <span>{{ lang|upper }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            <button class="mini mini-ok" type="submit">Potvrdit</button>
+          </div>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</div>

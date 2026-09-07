@@ -1,0 +1,32 @@
+<div class="modal-wrap">
+  <div class="scrim" onclick="closeModal()"></div>
+  <section class="modal" role="alertdialog" aria-modal="true" aria-labelledby="dtitle">
+    <h2 id="dtitle">Smazat „{{ plan.name }}“?</h2>
+    <p class="modal-lead">
+      {{ plan.count }}
+      {%- if plan.count == 1 %} soubor{% elif plan.count < 5 %} soubory{% else %} souborů{% endif %}
+      ({{ plan.source_paths|length }} ve zdroji, {{ plan.link_paths|length }} linků),
+      {{ plan.total_bytes|human_size }}. Nevratné.
+    </p>
+    <div class="paths">
+      {% for p in plan.paths %}
+        <div class="path-row {% if p in plan.link_paths %}is-link{% endif %}">
+          <span class="path-kind">{% if p in plan.link_paths %}link{% else %}soubor{% endif %}</span>
+          <span>{{ p }}</span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="modal-acts">
+      <button class="btn" type="button" onclick="closeModal()">Zrušit</button>
+      <form hx-post="/partial/delete" hx-target="#modal" hx-indicator="#spinner">
+        <input type="hidden" name="path" value="{{ plan.abs_path }}">
+        <input type="hidden" name="token" value="{{ plan.token }}">
+        <button class="btn btn-del" type="button" data-hold>
+          <span class="hold-fill" aria-hidden="true"></span>
+          <span class="hold-label">Podrž pro smazání</span>
+        </button>
+      </form>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,48 @@
+{% set l = listing %}
+<div id="view"
+     hx-get="/b/{{ l.category.key }}{% if l.rel %}?path={{ l.rel|urlencode }}{% endif %}"
+     hx-trigger="library-changed from:body" hx-target="this" hx-swap="outerHTML">
+
+  {% if l.rel %}
+    <div class="crumbs">
+      <a class="up" href="/b/{{ l.category.key }}{% if l.parent_rel %}?path={{ l.parent_rel|urlencode }}{% endif %}"
+         hx-get="/b/{{ l.category.key }}{% if l.parent_rel %}?path={{ l.parent_rel|urlencode }}{% endif %}"
+         hx-target="#view" hx-swap="outerHTML" hx-push-url="true">←</a>
+      <span class="crumb-now">{{ l.breadcrumbs[-1][0] }}</span>
+      {% if l.inside_show %}<span class="crumb-note">jen náhled obsahu</span>{% endif %}
+    </div>
+  {% endif %}
+
+  <div class="tools">
+    <input class="find" type="search" placeholder="Hledat" aria-label="Hledat"
+           autocomplete="off" spellcheck="false" oninput="filterView(this.value)">
+    <span class="count">{{ l.items|length }}</span>
+  </div>
+
+  {% if not l.items %}
+    <p class="none">Nic tu není.</p>
+  {% elif l.inside_show %}
+    <ul class="rows" id="results">
+      {% for item in l.items %}
+        <li class="cell" data-name="{{ item.name|lower }}">
+          {% if item.action == 'enter' %}
+            <a class="row" href="/b/{{ l.category.key }}?path={{ item.rel|urlencode }}"
+               hx-get="/b/{{ l.category.key }}?path={{ item.rel|urlencode }}"
+               hx-target="#view" hx-swap="outerHTML" hx-push-url="true">
+              <span class="row-name">{{ item.name }}</span><span class="row-side">›</span>
+            </a>
+          {% else %}
+            <div class="row row-flat">
+              <span class="row-name">{{ item.name }}</span>
+              <span class="row-side">{{ item.size|human_size }}</span>
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <ul class="grid" id="results">
+      {% for item in l.items %}{% include "partials/tile.html" %}{% endfor %}
+    </ul>
+  {% endif %}
+</div>

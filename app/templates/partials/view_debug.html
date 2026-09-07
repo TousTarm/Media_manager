@@ -1,0 +1,46 @@
+{# Diagnostika prostředí: práva, hardlinky, patch sorteru, ffprobe, Jellyfin. #}
+<div id="view" hx-get="/debug" hx-trigger="library-changed from:body"
+     hx-target="this" hx-swap="outerHTML">
+
+  <div class="crumbs">
+    <a class="up" href="/b/movies" hx-get="/b/movies" hx-target="#view"
+       hx-swap="outerHTML" hx-push-url="true" aria-label="Zpět">←</a>
+    <span class="crumb-now">Diagnostika</span>
+    <button class="mini" type="button" hx-get="/debug" hx-target="#view"
+            hx-swap="outerHTML" hx-indicator="#spinner">Přeměřit</button>
+  </div>
+
+  {% if report.status == 'ok' %}
+    <p class="lead">Všechno sedí. {{ report.checks|length }} kontrol prošlo.</p>
+  {% else %}
+    <p class="lead">
+      {% if report.failures %}<b>{{ report.failures|length }}
+        {%- if report.failures|length == 1 %} chyba{% elif report.failures|length < 5 %} chyby{% else %} chyb{% endif %}</b>{% endif %}
+      {%- if report.failures and report.warnings %}, {% endif %}
+      {%- if report.warnings %}{{ report.warnings|length }}
+        {%- if report.warnings|length == 1 %} varování{% else %} varování{% endif %}{% endif %}
+      z {{ report.checks|length }} kontrol. Chyby brání funkci, varování ne.
+    </p>
+  {% endif %}
+
+  <ul class="rows" id="results">
+    {% for c in report.checks %}
+      <li class="cell" data-name="{{ c.name|lower }}">
+        <div class="chk chk-{{ c.status }}">
+          <div class="chk-head">
+            <span class="chk-dot" aria-hidden="true"></span>
+            <span class="chk-name">{{ c.name }}</span>
+            <span class="chk-state">{{ {'ok': 'ok', 'warn': 'varování', 'fail': 'chyba'}[c.status] }}</span>
+          </div>
+          {% if c.detail %}<p class="chk-detail">{{ c.detail }}</p>{% endif %}
+          {% if c.hint %}<p class="chk-hint">{{ c.hint }}</p>{% endif %}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p class="foot-note">
+    Testy zápisu a hardlinků vytvoří dočasný soubor a hned ho smažou.
+    Na média nesahají. Strojově čitelná verze je na <code>/api/debug</code>.
+  </p>
+</div>

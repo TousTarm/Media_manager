@@ -1,0 +1,84 @@
+{% if toast %}{% include "partials/toast_oob.html" %}{% endif %}
+<div class="sheet-wrap">
+  <div class="scrim" onclick="closePanel()"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-label="Detail">
+    <header class="sheet-head">
+      <div>
+        <h2>{{ d.name }}</h2>
+        <p class="sheet-sub">
+          {{ d.category.label }}
+          {%- if d.kind == 'show' %} · {{ d.file_count }} epizod{% endif %}
+          · {{ d.total_bytes|human_size }}
+        </p>
+      </div>
+      <button class="x" type="button" onclick="closePanel()" aria-label="Zavřít">✕</button>
+    </header>
+
+    <div class="sheet-body">
+      <form id="targets-form" hx-post="/partial/detail/save"
+            hx-target="#panel" hx-indicator="#spinner">
+        <input type="hidden" name="path" value="{{ d.abs_path }}">
+        <div class="label-row">
+          <span class="label">Jazyk</span>
+          {% if d.has_override %}
+            <span class="mark" title="Nastaveno {{ d.override_set_at }}">ruční</span>
+          {% else %}
+            <span class="label-dim">automaticky</span>
+          {% endif %}
+        </div>
+        <div class="picks">
+          {% for lang in LANGS %}
+            <label class="pick">
+              <input type="checkbox" name="targets" value="{{ lang }}"
+                     {% if lang in d.effective_targets %}checked{% endif %}>
+              <span class="pick-face">
+                <b>{{ lang|upper }}</b>
+                <i>{{ LANG_LABELS[lang] }}</i>
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="acts">
+          <button class="btn btn-go" type="submit">Uložit</button>
+          {% if d.has_override %}
+            <button class="btn" type="button" hx-post="/partial/detail/clear"
+                    hx-target="#panel" hx-vals='{"path": {{ d.abs_path|tojson }}}'>Zpět na auto</button>
+          {% endif %}
+        </div>
+        <p class="hint">Nic zaškrtnutého = nikam. Uloží se hned, včetně hardlinků.</p>
+      </form>
+
+      <dl class="facts">
+        <dt>Audio stopy</dt>
+        <dd>
+          {% if d.probe_langs %}<code>{{ d.probe_langs|join(', ') }}</code>
+          {% else %}<code>nezměřeno</code>{% endif %}
+          {% if d.probe_stale %}<span class="stale">cache neplatí</span>{% endif %}
+          <form class="inline" hx-post="/partial/detail/reanalyze"
+                hx-target="#panel" hx-indicator="#spinner">
+            <input type="hidden" name="path" value="{{ d.abs_path }}">
+            <button class="mini" type="submit">Přeanalyzovat</button>
+          </form>
+        </dd>
+        <dt>Teď leží v</dt>
+        <dd>{% if d.langs %}{% for lang in d.langs %}<b class="lang">{{ lang|upper }}</b>{% endfor %}
+            {% else %}<span class="label-dim">nikde</span>{% endif %}</dd>
+        <dt>Cesta</dt>
+        <dd><code class="path">{{ d.abs_path }}</code></dd>
+      </dl>
+
+      {% if d.kind == 'show' %}
+        <button class="btn" type="button"
+                hx-get="/b/{{ d.category.key }}?path={{ d.rel|urlencode }}"
+                hx-target="#view" hx-swap="outerHTML" hx-push-url="true"
+                onclick="closePanel()">Zobrazit sezóny a epizody</button>
+      {% endif %}
+
+      <button class="btn btn-del" type="button"
+              hx-get="/partial/delete?path={{ d.abs_path|urlencode }}"
+              hx-target="#modal" hx-indicator="#spinner">
+        Smazat {% if d.kind == 'show' %}celou show{% else %}film{% endif %}
+      </button>
+    </div>
+  </section>
+</div>

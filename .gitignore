@@ -1,0 +1,19 @@
+# Konfigurace s heslem a API klíčem — na cílovém stroji se vytváří ručně.
+.env
+.env.*
+!.env.example
+
+# Virtuální prostředí
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Editory
+.vscode/
+.idea/
+*.swp

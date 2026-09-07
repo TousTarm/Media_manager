@@ -1,0 +1,17 @@
+[Unit]
+Description=Media Manager
+After=network.target jellyfin.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/media-manager
+# Konfigurace se čte z /opt/media-manager/.env přímo aplikací (pydantic-settings).
+# EnvironmentFile tu schválně není: duplikoval by načítání a proměnné prostředí
+# by tiše přebily .env.
+ExecStart=/opt/media-manager/venv/bin/python -m app.run
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
