@@ -21,11 +21,12 @@ do horních tabů a bočního panelu.
 Nahoře je hledání přes všechny tři složky naráz. Názvy se v UI zobrazují zkrácené
 (bez `[skupiny]`, kvality a kodeku); plný název je v tooltipu a v detailu u cesty.
 
-**Spojení sezón.** Když je jedna show ve dvou složkách (např. sezóna 1 a později
-stažená sezóna 2), Jellyfin je bere jako dvě show. V detailu show je tlačítko
-*Spojit s jinou složkou*: vybrané složky se přesunou (rename, nic se nekopíruje)
-do `Název/Season N`. Složka, která už `Season …` podsložky má, se jen doplní.
-Hardlinky v `sorted/`, ruční nastavení i cache ffprobe se přenesou.
+**Další sezóna.** Když je sezóna 2 stažená zvlášť, Jellyfin ji bere jako jinou show.
+V jejím detailu je *Patří k jiné show…* — klikneš na show, ke které patří (nejpodobnější
+názvy jsou nahoře), a složka se do ní přesune jako `Season N` (číslo z názvu, jinak
+další volné). Cílová složka si nechá název, takže ji Jellyfin dál pozná; pokud ještě
+sezóny neměla, její epizody se přesunou do `Season 1`. Nic se nekopíruje, hardlinky,
+ruční nastavení i cache ffprobe se přenesou.
 
 Jazyky jsou tři: **CZ**, **EN**, **JP** (`sorted/cz`, `sorted/en`, `sorted/jp`).
 Libovolná kombinace, včetně žádné — „nikam“ je platné rozhodnutí, ne absence

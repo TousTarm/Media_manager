@@ -196,6 +196,35 @@ def merge_shows(paths: list[str], name: str, seasons: dict[str, int]) -> dict:
     return {"name": target.name, "path": str(target), "count": len(sources)}
 
 
+def attach_season(abs_path: str, target_path: str) -> dict:
+    """„Tahle složka je další sezóna téhle show“ — přesune ji do ní jako Season N.
+
+    Cílová složka si nechá název, takže ji Jellyfin pozná jako tu samou show.
+    Když cíl ještě sezóny nemá, jeho epizody se přesunou do „Season 1“.
+    """
+    cat, p = library.locate(abs_path)
+    src = library.show_root_of(cat, p)
+    tcat, t = library.locate(target_path)
+    target = library.show_root_of(tcat, t)
+    if tcat != cat or target == src:
+        raise library.PathError("Vyber jinou show ze stejné kategorie")
+
+    seasons: dict[str, int] = {}
+    taken = library.season_numbers(target)
+    if not library._is_merged_show(target):
+        own = library.guess_season(target.name) or 1
+        seasons[str(target)] = own
+        taken.add(own)
+    season = library.guess_season(src.name)
+    if season is None or season in taken:
+        season = max(taken, default=0) + 1
+    seasons[str(src)] = season
+
+    result = merge_shows([str(target), str(src)], target.name, seasons)
+    result["season"] = season
+    return result
+
+
 def review_items() -> list[library.Item]:
     """Fronta na kontrolu + doplněné jazyky z ffprobe cache.
 

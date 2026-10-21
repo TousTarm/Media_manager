@@ -98,10 +98,10 @@ document.body.addEventListener('htmx:responseError', (e) =>
 
 document.body.addEventListener('htmx:historyRestore', () => { closePanel(); closeModal(); });
 
-/* Filtr řádků v modalu (spojení show). */
+/* Filtr řádků v modalu (přiřazení sezóny). */
 function filterList(input, selector) {
   const needle = (input.value || '').trim().toLowerCase();
-  input.closest('form').querySelectorAll(selector).forEach((row) => {
+  input.closest('.modal').querySelectorAll(selector).forEach((row) => {
     row.classList.toggle('hide', !!needle && !(row.dataset.name || '').includes(needle));
   });
 }

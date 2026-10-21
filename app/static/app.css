@@ -458,24 +458,19 @@ a { color: inherit; text-decoration: none; }
 }
 @media (min-width: 760px) { .credit { bottom: 8px; } }
 
-/* ----------------------------------------------------------- spojení show */
+/* ------------------------------------------------------ přiřazení sezóny */
 
-.merge { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-.merge .find { flex: none; }
 .merge-list {
-  overflow: auto; max-height: 40dvh; display: flex; flex-direction: column;
+  overflow: auto; max-height: 45dvh; display: flex; flex-direction: column;
   border: 1px solid var(--line); border-radius: var(--r); background: var(--surface);
 }
-.merge-row {
-  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 10px;
-  border-bottom: 1px solid var(--line); font-size: 13.5px;
+.attach-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: 48px; padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--line); font-size: 14px;
 }
-.merge-row:last-child { border-bottom: 0; }
-.merge-row.hide { display: none; }
-.merge-row input[type=checkbox] { width: 18px; height: 18px; flex: none; accent-color: var(--go); }
-.merge-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.merge-season { flex: none; display: flex; align-items: center; gap: 3px; font: 600 12px var(--mono); color: var(--faint); }
-.merge-season input {
-  width: 46px; height: 32px; padding: 0 6px; text-align: center;
-  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r);
-}
+.attach-row:last-child { border-bottom: 0; }
+.attach-row:active, .attach-row:hover { background: var(--raised); }
+.attach-row b { font-weight: 500; overflow-wrap: anywhere; }
+.attach-row small { font-size: 11px; color: var(--faint); overflow-wrap: anywhere; }
+.attach-row.hide { display: none; }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from difflib import SequenceMatcher
 import logging
 from pathlib import Path
 from typing import Annotated, Literal
@@ -308,30 +309,28 @@ async def page_search(request: Request, _: Auth, q: str = ""):
                  "partials/view_search.html")
 
 
-@app.get("/partial/merge", response_class=HTMLResponse, include_in_schema=False)
-async def partial_merge_modal(request: Request, _: Auth, path: str):
+@app.get("/partial/attach", response_class=HTMLResponse, include_in_schema=False)
+async def partial_attach_modal(request: Request, _: Auth, path: str):
     cat, p = library.locate(path)
     current = library.show_root_of(cat, p)
-    shows = [s for s in library.top_level(cat) if s.is_dir()]
-    shows.sort(key=lambda s: s != current)   # aktuální nahoru, zbytek abecedně
-    rows = [{"path": str(s), "name": s.name, "checked": s == current,
-             "season": library.guess_season(s.name) or 1} for s in shows]
-    return templates.TemplateResponse(request, "partials/merge_modal.html", {
-        "cat": cat, "rows": rows, "name": library.show_base_name(current.name),
-    })
+    base = library.show_base_name(current.name).casefold()
+    shows = [s for s in library.top_level(cat) if s.is_dir() and s != current]
+    # Nejpodobnější názvy nahoru — hledaná show bývá první.
+    shows.sort(key=lambda s: -SequenceMatcher(
+        None, base, library.show_base_name(s.name).casefold()).ratio())
+    return templates.TemplateResponse(request, "partials/attach_modal.html",
+                                      {"current": current, "shows": shows})
 
 
-@app.post("/partial/merge", response_class=HTMLResponse, include_in_schema=False)
-async def partial_merge(
+@app.post("/partial/attach", response_class=HTMLResponse, include_in_schema=False)
+async def partial_attach(
     request: Request, _: Auth,
-    name: Annotated[str, Form()],
-    paths: Annotated[list[str], Form()] = [],
-    all: Annotated[list[str], Form()] = [],
-    season: Annotated[list[int], Form()] = [],
+    path: Annotated[str, Form()],
+    target: Annotated[str, Form()],
 ):
-    seasons = {p: n for p, n in zip(all, season) if p in paths}
-    result = service.merge_shows(paths, name, seasons)
-    toast = {"kind": "ok", "message": f"Spojeno do „{result['name']}“ ({result['count']} složky)"}
+    r = service.attach_season(path, target)
+    toast = {"kind": "ok",
+             "message": f"Přidáno jako Season {r['season']} do „{library.clean_name(r['name'])}“"}
     return templates.TemplateResponse(
         request, "partials/deleted.html", {"toast": toast},
         headers={"HX-Trigger": "library-changed"},

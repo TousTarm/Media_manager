@@ -1,0 +1,29 @@
+{# „Tahle složka je další sezóna téhle show“ — jeden klik na cílovou show. #}
+<div class="modal-wrap">
+  <div class="scrim" onclick="closeModal()"></div>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="atitle">
+    <h2 id="atitle">„{{ current.name|clean_name }}“ patří k…</h2>
+    <p class="modal-lead">
+      Klikni na show, ke které tahle složka patří. Přesune se do ní jako další
+      sezóna (nic se nekopíruje) a Jellyfin je pak ukáže pohromadě.
+    </p>
+    <input class="find" type="search" placeholder="Filtrovat" autocomplete="off"
+           oninput="filterList(this, '.attach-row')">
+    <div class="merge-list">
+      {% for s in shows %}
+        <button class="attach-row" type="button"
+                data-name="{{ s.name|lower }} {{ s.name|clean_name|lower }}"
+                hx-post="/partial/attach" hx-target="#modal" hx-indicator="#spinner"
+                hx-vals='{{ {"path": current|string, "target": s|string}|tojson }}'>
+          <b>{{ s.name|clean_name }}</b>
+          {% if s.name|clean_name != s.name %}<small>{{ s.name }}</small>{% endif %}
+        </button>
+      {% else %}
+        <p class="none">Žádná jiná show v téhle kategorii.</p>
+      {% endfor %}
+    </div>
+    <div class="modal-acts">
+      <button class="btn" type="button" onclick="closeModal()">Zrušit</button>
+    </div>
+  </section>
+</div>

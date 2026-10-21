@@ -99,6 +99,18 @@ assert (tmp / "Anime/Cyber/Season 3/c3.mkv").is_file() and (tmp / "Anime/Cyber/S
 assert sorter.run_once()["removed"] == 0, "sorter nemá po spojení nic uklízet"
 assert linked("c3.mkv") == ["en/Anime/Cyber/Season 3/c3.mkv"]
 
+# --- „patří k“: S02 do show, která sezóny ještě nemá; pak další bez čísla v názvu
+video("Series/[Grp] Edge - 01 ~ 10/e1.mkv", ["eng"])
+video("Series/Edge - Season 2/e2.mkv", ["eng"])
+video("Series/Edge extra/e9.mkv", ["eng"])
+sorter.run_once()
+edge = tmp / "Series/[Grp] Edge - 01 ~ 10"
+r = service.attach_season(str(tmp / "Series/Edge - Season 2"), str(edge))
+assert r["season"] == 2 and (edge / "Season 1/e1.mkv").is_file() and (edge / "Season 2/e2.mkv").is_file()
+assert service.attach_season(str(tmp / "Series/Edge extra"), str(edge / "Season 1"))["season"] == 3
+assert linked("e9.mkv") == ["en/Series/[Grp] Edge - 01 ~ 10/Season 3/e9.mkv"]
+assert sorter.run_once()["removed"] == 0
+
 cookie = auth.make_session()
 assert auth.session_valid(cookie)
 assert not auth.session_valid(cookie[:-1] + ("0" if cookie[-1] != "0" else "1"))

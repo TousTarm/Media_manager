@@ -450,6 +450,12 @@ def show_base_name(name: str) -> str:
     return base.strip(" -") or clean_name(name)
 
 
+def season_numbers(path: Path) -> set[int]:
+    """Čísla už existujících podsložek „Season N“."""
+    return {int(m.group(1)) for c in path.iterdir()
+            if c.is_dir() and (m := re.match(r"(?i)^season\s*0*(\d+)", c.name))}
+
+
 def _is_merged_show(path: Path) -> bool:
     """Už má podsložky „Season N“ a žádné video přímo v sobě."""
     children = list(path.iterdir())

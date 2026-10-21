@@ -74,8 +74,8 @@
                 hx-target="#view" hx-swap="outerHTML" hx-push-url="true"
                 onclick="closePanel()">Zobrazit sezóny a epizody</button>
         <button class="btn" type="button"
-                hx-get="/partial/merge?path={{ d.abs_path|urlencode }}"
-                hx-target="#modal" hx-indicator="#spinner">Spojit s jinou složkou (další sezóna)</button>
+                hx-get="/partial/attach?path={{ d.abs_path|urlencode }}"
+                hx-target="#modal" hx-indicator="#spinner">Patří k jiné show (další sezóna)…</button>
       {% endif %}
 
       <button class="btn btn-del" type="button"
