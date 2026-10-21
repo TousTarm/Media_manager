@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -14,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from . import diagnostics, library, overrides, service
 from .auth import Auth
-from .config import LANG_LABELS, LANGS, TABS, get_settings
+from .config import LANG_LABELS, LANGS, TABS, Category, get_settings
 from .library import PathError
 
 logging.basicConfig(
@@ -70,12 +71,17 @@ async def _value_error(request: Request, exc: ValueError):
     return await _path_error(request, PathError(str(exc)))
 
 
-def _page(request: Request, template: str, ctx: dict, partial: str):
+def _page(request: Request, template: str, ctx: dict, partial: str,
+          headers: dict[str, str] | None = None):
     """HTMX dostane jen vnitřek, přímé načtení celou stránku."""
     ctx = {**ctx, "health": service.library_health()}
     if request.headers.get("HX-Request"):
-        return templates.TemplateResponse(request, partial, ctx)
-    return templates.TemplateResponse(request, template, ctx)
+        return templates.TemplateResponse(request, partial, ctx, headers=headers)
+    return templates.TemplateResponse(request, template, ctx, headers=headers)
+
+
+def _browse_url(cat: Category, rel: str) -> str:
+    return f"/b/{cat.key}" + (f"?path={quote(rel, safe='/')}" if rel else "")
 
 
 # --------------------------------------------------------------------------
@@ -95,10 +101,23 @@ async def healthz():
 @app.get("/b/{category}", response_class=HTMLResponse, include_in_schema=False)
 async def page_browse(request: Request, _: Auth, category: str, path: str = ""):
     cat = library.get_category(category)
-    listing = library.browse(cat, path, overrides.load_all())
+    # Po smazání poslední položky složka zmizí, ale URL v prohlížeči (a hx-get
+    # na #view, který se po `library-changed` obnovuje) na ni dál ukazuje.
+    # Místo PathError se výpis vrátí do nejbližší existující nadřazené složky
+    # a adresa se opraví — u HTMX hlavičkou, u přímého načtení redirectem.
+    wanted = path.strip().strip("/")
+    rel = library.nearest_listing_rel(cat, wanted)
+    headers: dict[str, str] = {}
+    if rel != wanted:
+        url = _browse_url(cat, rel)
+        if not request.headers.get("HX-Request"):
+            return RedirectResponse(url, status_code=302)
+        headers["HX-Replace-Url"] = url
+
+    listing = library.browse(cat, rel, overrides.load_all())
     return _page(request, "index.html",
                  {"listing": listing, "active": cat.key},
-                 "partials/view_browse.html")
+                 "partials/view_browse.html", headers=headers)
 
 
 @app.get("/auto", response_class=HTMLResponse, include_in_schema=False)

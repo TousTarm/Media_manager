@@ -63,6 +63,20 @@ def resolve_in_source(cat: Category, rel: str | None) -> Path:
     return _safe_join(source_root(cat), rel)
 
 
+def nearest_listing_rel(cat: Category, rel: str | None) -> str:
+    """Nejbližší existující složka na cestě od `rel` nahoru ke kořeni kategorie.
+
+    Po smazání poslední položky složka zmizí (`prune_empty_dirs`), ale prohlížeč
+    na ni dál ukazuje. Výpis se tehdy má vrátit o úroveň výš, ne skončit chybou.
+    Cesta mimo strom zůstává chybou — na tu se potichu nepadá.
+    """
+    root = source_root(cat)
+    current = resolve_in_source(cat, rel)
+    while current != root and not current.is_dir():
+        current = current.parent
+    return "" if current == root else str(current.relative_to(root))
+
+
 def locate(abs_path: str | Path) -> tuple[Category, Path]:
     """Najde kategorii, do jejíhož zdrojového kořene daná absolutní cesta patří."""
     path = Path(abs_path)

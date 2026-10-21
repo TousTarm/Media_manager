@@ -23,7 +23,10 @@
   </nav>
 </header>
 
-<main class="main">
+{#- Historie (hx-push-url) snapshotuje a obnovuje jen obsah <main>, tedy #view.
+    Panel, modal, toasty a spinner jsou mimo, takže je back/forward nikdy
+    nepřepíše — ani při cache-missu, kdy HTMX stahuje partial ze serveru. -#}
+<main class="main" hx-history-elt>
   {% if active == 'auto' %}{% include "partials/view_auto.html" %}
   {% elif active == 'debug' %}{% include "partials/view_debug.html" %}
   {% else %}{% include "partials/view_browse.html" %}{% endif %}

@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0e14">
   <meta name="color-scheme" content="dark light">
+  {#- Žádná implicitní dědičnost hx-* atributů. #view nese hx-swap="outerHTML"
+      pro vlastní obnovu po `library-changed`; bez tohohle by ho zdědila každá
+      dlaždice uvnitř a její hx-target="#panel" by panel místo naplnění nahradil
+      (a tím zničil). Každý prvek si proto říká vše sám, výslovně. -#}
+  <meta name="htmx-config" content='{"disableInheritance": true}'>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

@@ -42,7 +42,8 @@
           <button class="btn btn-go" type="submit">Uložit</button>
           {% if d.has_override %}
             <button class="btn" type="button" hx-post="/partial/detail/clear"
-                    hx-target="#panel" hx-vals='{"path": {{ d.abs_path|tojson }}}'>Zpět na auto</button>
+                    hx-target="#panel" hx-indicator="#spinner"
+                    hx-vals='{"path": {{ d.abs_path|tojson }}}'>Zpět na auto</button>
           {% endif %}
         </div>
         <p class="hint">Nic zaškrtnutého = nikam. Uloží se hned, včetně hardlinků.</p>
