@@ -9,7 +9,7 @@
          hx-get="/b/{{ l.category.key }}{% if l.parent_rel %}?path={{ l.parent_rel|urlencode }}{% endif %}"
          hx-target="#view" hx-swap="outerHTML" hx-push-url="true">←</a>
       <span class="crumb-now">{{ l.breadcrumbs[-1][0] }}</span>
-      {% if l.inside_show %}<span class="crumb-note">jen náhled obsahu</span>{% endif %}
+      {% if l.inside_show %}<span class="crumb-note">složka = jazyk sezóny</span>{% endif %}
     </div>
   {% endif %}
 
@@ -25,7 +25,17 @@
     <ul class="rows" id="results">
       {% for item in l.items %}
         <li class="cell" data-name="{{ item.name|lower }}">
-          {% if item.action == 'enter' %}
+          {% if item.action == 'detail' %}
+            <button class="row" type="button"
+                    hx-get="/partial/detail?path={{ item.abs_path|urlencode }}"
+                    hx-target="#panel" hx-indicator="#spinner">
+              <span class="row-name">{{ item.name }}</span>
+              <span class="row-side">
+                {%- for lang in item.langs %}<b class="lang">{{ lang|upper }}</b> {% else %}<b class="lang lang-off">?</b>{% endfor %}
+                {%- if item.has_override %} <span class="mark" title="Ruční rozhodnutí">M</span>{% endif %}
+              </span>
+            </button>
+          {% elif item.action == 'enter' %}
             <a class="row" href="/b/{{ l.category.key }}?path={{ item.rel|urlencode }}"
                hx-get="/b/{{ l.category.key }}?path={{ item.rel|urlencode }}"
                hx-target="#view" hx-swap="outerHTML" hx-push-url="true">

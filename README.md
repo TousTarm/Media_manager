@@ -118,9 +118,11 @@ z `langs` v `sorter_db.json` — to je jen výsledek ffprobe měření a o skute
 umístění hardlinků nevypovídá.
 
 **Klíčování override.** U filmu je klíčem přesná cesta k souboru, u seriálu a
-anime kořenová složka show. Tapneš-li v appce na epizodu, detail i override se
-stejně vztáhnou na celou show; sorter si stejný klíč odvodí ze své sample cesty
-přes `library.show_root_of()`.
+anime složka: kořen show (platí pro celou show), nebo podsložka — sezóna. Uvnitř
+show se na sezónu ťukne a nastaví se jí vlastní jazyk. Sorter bere nejbližší
+nastavení od složky epizod nahoru ke kořeni show. Uložení jazyka pro celou show
+nastavení sezón zruší. Při „Patří k jiné show“ se ruční nastavení přesouvané
+složky stane nastavením její nové sezóny.
 
 **Auto tab a co znamená „potvrdit“.** Seznam drží položky bez override, tedy
 to, co pořád řídí sorter. Potvrzení zapíše aktuální (nebo tebou upravený) stav do

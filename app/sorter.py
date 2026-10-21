@@ -77,9 +77,18 @@ def _groups(cat: Category):
 
 
 def _override_for(cat: Category, sample: Path, ovr: dict) -> list[str] | None:
-    key = sample if cat.kind == "movie" else library.show_root_of(cat, sample)
-    entry = ovr.get(str(key))
-    return None if entry is None else list(entry.get("targets") or [])
+    """Film: přesná cesta. Show: nejbližší nastavení od složky sezóny nahoru ke kořeni show."""
+    if cat.kind == "movie":
+        keys = [sample]
+    else:
+        show = library.show_root_of(cat, sample)
+        keys = [sample.parent, *sample.parent.parents]
+        keys = keys[:keys.index(show) + 1] if show in keys else [show]
+    for key in keys:
+        entry = ovr.get(str(key))
+        if entry is not None:
+            return list(entry.get("targets") or [])
+    return None
 
 
 def _settling(files: list[Path], now: float) -> bool:

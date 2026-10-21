@@ -111,6 +111,28 @@ assert service.attach_season(str(tmp / "Series/Edge extra"), str(edge / "Season 
 assert linked("e9.mkv") == ["en/Series/[Grp] Edge - 01 ~ 10/Season 3/e9.mkv"]
 assert sorter.run_once()["removed"] == 0
 
+# --- jazyk po sezónách
+video("Series/Duo/Season 1/d1.mkv", ["eng"])
+video("Series/Duo/Season 2/d2.mkv", ["eng"])
+service.set_targets(str(tmp / "Series/Duo"), ["en"])
+service.set_targets(str(tmp / "Series/Duo/Season 2"), ["cz"])
+sorter.run_once()
+assert linked("d1.mkv") == ["en/Series/Duo/Season 1/d1.mkv"]
+assert linked("d2.mkv") == ["cz/Series/Duo/Season 2/d2.mkv"], linked("d2.mkv")
+d = service.get_detail(str(tmp / "Series/Duo/Season 1/d1.mkv"))     # epizoda = její sezóna
+assert d.is_season and d.abs_path.endswith("Season 1") and d.inherited == "EN"
+service.set_targets(str(tmp / "Series/Duo"), ["en"])                 # celá show zruší výjimku
+sorter.run_once()
+assert linked("d2.mkv") == ["en/Series/Duo/Season 2/d2.mkv"]
+
+# ruční nastavení přidané sezóny se z „celé show“ stane nastavením té sezóny
+video("Series/Duo S03/d3.mkv", ["eng"])
+service.set_targets(str(tmp / "Series/Duo S03"), ["cz"])
+service.attach_season(str(tmp / "Series/Duo S03"), str(tmp / "Series/Duo"))
+assert overrides.get_override(tmp / "Series/Duo/Season 3")["targets"] == ["cz"]
+sorter.run_once()
+assert linked("d3.mkv") == ["cz/Series/Duo/Season 3/d3.mkv"]
+
 cookie = auth.make_session()
 assert auth.session_valid(cookie)
 assert not auth.session_valid(cookie[:-1] + ("0" if cookie[-1] != "0" else "1"))

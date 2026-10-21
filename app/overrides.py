@@ -70,6 +70,19 @@ def clear_override(key: str | Path) -> bool:
     return bool(mutate_json(_path(), _apply))
 
 
+def move_prefix(old: str | Path, new: str | Path) -> int:
+    """Po přesunu složky přejmenuje klíče pod ní (stejně jako probe.move_prefix)."""
+    old, new = str(old), str(new)
+
+    def _apply(data: dict):
+        hit = [k for k in data if k == old or k.startswith(old.rstrip("/") + "/")]
+        for k in hit:
+            data[new + k[len(old):]] = data.pop(k)
+        return len(hit) or False
+
+    return int(mutate_json(_path(), _apply) or 0)
+
+
 def clear_overrides_under(prefix: str | Path) -> int:
     """Smaže override pro cestu i všechny cesty pod ní (mazání celé show)."""
     prefix_str = str(prefix)

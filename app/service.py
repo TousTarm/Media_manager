@@ -33,8 +33,17 @@ class Detail:
     auto_langs: list[str] = field(default_factory=list)     # co by řekla automatika
     override_targets: list[str] | None = None
     override_set_at: str | None = None
+    inherited: str | None = None      # nastavení zděděné ze show (u sezóny)
     file_count: int = 0
     total_bytes: int = 0
+
+    @property
+    def is_season(self) -> bool:
+        return self.kind == "show" and len(Path(self.rel).parts) > 1
+
+    @property
+    def show_name(self) -> str:
+        return Path(self.rel).parts[0]
 
     @property
     def has_override(self) -> bool:
@@ -71,6 +80,15 @@ def get_detail(abs_path: str) -> Detail:
     if ov is not None:
         detail.override_targets = list(ov.get("targets") or [])
         detail.override_set_at = ov.get("set_at")
+    elif detail.is_season:
+        show = library.show_root_of(cat, subject)
+        ovr = overrides.load_all()
+        for parent in subject.parents:
+            if str(parent) in ovr:
+                detail.inherited = "+".join(ovr[str(parent)].get("targets") or []).upper() or "nikam"
+                break
+            if parent == show:
+                break
 
     db = probe.load_db()
     probe_target = videos[0] if videos else (subject if subject.is_file() else None)
@@ -106,6 +124,8 @@ def set_targets(abs_path: str, targets: list[str]) -> dict:
 
     with sorter.lock:
         result = library.apply_targets(cat, subject, clean)
+        if subject.is_dir():
+            overrides.clear_overrides_under(subject)   # celá show přebije výjimky sezón
         overrides.set_override(subject, clean)
     log.info(
         "Override uložen: %s -> %s (+%d linků, -%d linků)",
@@ -178,18 +198,11 @@ def merge_shows(paths: list[str], name: str, seasons: dict[str, int]) -> dict:
     by_src = {library.show_root_of(cat, library.locate(p)[1]): n for p, n in seasons.items()}
 
     with sorter.lock:
-        old = overrides.load_all()
-        manual = [old[str(s)]["targets"] for s in sources if str(s) in old]
         target, moved = library.execute_merge(cat, sources, name, by_src)
-        for src in sources:
-            overrides.clear_overrides_under(src)
         for src, new in moved:
+            # Nastavení jazyka jde se složkou: z celé S02 se stane nastavení „Season 2“.
+            overrides.move_prefix(src, new)
             probe.move_prefix(src, new)
-        if manual:
-            # Aspoň jedna část měla ruční rozhodnutí — platí pro celou show (sjednocené).
-            union = overrides.normalize_targets([t for ts in manual for t in ts])
-            library.apply_targets(cat, target, union)
-            overrides.set_override(target, union)
 
     log.info("Spojeno do %s: %s", target, ", ".join(s.name for s in sources))
     trigger_refresh()

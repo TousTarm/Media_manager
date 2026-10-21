@@ -6,7 +6,7 @@
       <div>
         <h2 title="{{ d.name }}">{{ d.name|clean_name }}</h2>
         <p class="sheet-sub">
-          {{ d.category.label }}
+          {% if d.is_season %}{{ d.show_name|clean_name }}{% else %}{{ d.category.label }}{% endif %}
           {%- if d.kind == 'show' %} · {{ d.file_count }} epizod{% endif %}
           · {{ d.total_bytes|human_size }}
         </p>
@@ -22,6 +22,8 @@
           <span class="label">Jazyk</span>
           {% if d.has_override %}
             <span class="mark" title="Nastaveno {{ d.override_set_at }}">ruční</span>
+          {% elif d.inherited %}
+            <span class="label-dim">podle celé show ({{ d.inherited }})</span>
           {% else %}
             <span class="label-dim">automaticky</span>
           {% endif %}
@@ -43,10 +45,11 @@
           {% if d.has_override %}
             <button class="btn" type="button" hx-post="/partial/detail/clear"
                     hx-target="#panel" hx-indicator="#spinner"
-                    hx-vals='{"path": {{ d.abs_path|tojson }}}'>Zpět na auto</button>
+                    hx-vals='{"path": {{ d.abs_path|tojson }}}'>{% if d.is_season %}Podle celé show{% else %}Zpět na auto{% endif %}</button>
           {% endif %}
         </div>
-        <p class="hint">Nic zaškrtnutého = nikam. Uloží se hned, včetně hardlinků.</p>
+        <p class="hint">Nic zaškrtnutého = nikam. Uloží se hned, včetně hardlinků.
+          {%- if d.kind == 'show' and not d.is_season %} Platí pro celou show a zruší nastavení jednotlivých sezón — sezónu nastavíš po rozkliknutí v „Zobrazit sezóny“.{% endif %}</p>
       </form>
 
       <dl class="facts">
@@ -72,16 +75,19 @@
         <button class="btn" type="button"
                 hx-get="/b/{{ d.category.key }}?path={{ d.rel|urlencode }}"
                 hx-target="#view" hx-swap="outerHTML" hx-push-url="true"
-                onclick="closePanel()">Zobrazit sezóny a epizody</button>
+                hx-on::after-request="closePanel()">
+          {%- if d.is_season %}Zobrazit epizody{% else %}Zobrazit sezóny a epizody{% endif %}</button>
+        {% if not d.is_season %}
         <button class="btn" type="button"
                 hx-get="/partial/attach?path={{ d.abs_path|urlencode }}"
                 hx-target="#modal" hx-indicator="#spinner">Patří k jiné show (další sezóna)…</button>
+        {% endif %}
       {% endif %}
 
       <button class="btn btn-del" type="button"
               hx-get="/partial/delete?path={{ d.abs_path|urlencode }}"
               hx-target="#modal" hx-indicator="#spinner">
-        Smazat {% if d.kind == 'show' %}celou show{% else %}film{% endif %}
+        Smazat {% if d.is_season %}tuhle složku{% elif d.kind == 'show' %}celou show{% else %}film{% endif %}
       </button>
     </div>
   </section>

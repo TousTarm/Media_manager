@@ -99,12 +99,14 @@ def show_root_of(cat: Category, path: Path) -> Path:
 def subject_of(cat: Category, path: Path) -> Path:
     """Na co se vztahuje klasifikace pro danou cestu.
 
-    U seriálů a anime je to vždy kořenová složka show. U filmů samotný soubor —
+    U seriálů a anime složka: kořen show, nebo sezóna (podsložka), když se klikne
+    na ni — epizoda se bere za svou složku. U filmů samotný soubor —
     a když uživatel klikne na složku filmu, tak jediný video soubor uvnitř,
     protože sorter klíčuje filmy přesnou cestou k souboru.
     """
     if cat.kind == "show":
-        return show_root_of(cat, path)
+        show_root_of(cat, path)              # ověří, že to není kořen kategorie
+        return path.parent if path.is_file() and path.parent != source_root(cat) else path
     if path.is_dir():
         videos = video_files_under(path)
         if len(videos) == 1:
@@ -357,13 +359,14 @@ def browse(cat: Category, rel: str | None, overrides: dict[str, dict]) -> Listin
             rel=str(path.relative_to(root)),
             abs_path=str(path),
             is_dir=is_dir,
-            action="enter" if is_dir else ("none" if inside_show else "detail"),
+            action=("detail" if inside_show else "enter") if is_dir
+                   else ("none" if inside_show else "detail"),
             size=0 if is_dir else size,
             mtime=mtime,
             category=cat.key,
         ))
 
-    if depth > 0 and not inside_show:
+    if depth > 0:
         for item in items:
             if item.action == "detail":
                 item.langs = linked_langs(cat, Path(item.abs_path))

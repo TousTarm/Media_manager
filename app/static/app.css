@@ -186,7 +186,7 @@ a { color: inherit; text-decoration: none; }
 }
 .row:active { background: var(--raised); }
 .row-flat { opacity: .65; }
-.row-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.row-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; text-align: left; }
 .row-side { flex: none; color: var(--faint); font-size: 12px; }
 
 .mini {
