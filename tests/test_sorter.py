@@ -60,6 +60,45 @@ sorter.run_once()
 assert linked("e1.mkv") == []
 assert sorter.run_once()["created"] == 0                   # druhý běh nic nemění
 
+# --- zkrácené názvy, hledání
+from app import library, service  # noqa: E402
+assert library.clean_name("[Erai-raws] Cyberpunk - Edgerunners - 01 ~ 10 [1080p][Multiple Subtitle]") \
+    == "Cyberpunk - Edgerunners"
+assert library.clean_name("Alien.Covenant.2017.1080p.BluRay.x264-[YTS.AG].mp4") == "Alien Covenant 2017"
+assert library.show_base_name("Cyberpunk - Edgerunners - Season 2") == "Cyberpunk - Edgerunners"
+assert library.guess_season("Cyberpunk - Edgerunners - Season 2") == 2
+assert library.guess_season("JoJo (Seasons 1-4 + OVAs)") is None
+found = library.search("show", {})
+assert [i.name for i in found["series"]] == ["Show"] and "movies" not in found
+
+# --- spojení dvou sezón a pak přidání třetí do už spojené show
+video("Anime/[Grp] Cyber - 01 ~ 10 [1080p]/c1.mkv", ["jpn", "eng"])
+video("Anime/Cyber - Season 2/c2.mkv", ["jpn"])
+video("Anime/Cyber S03/c3.mkv", ["eng"])
+sorter.run_once()
+assert linked("c1.mkv") == ["en/Anime/[Grp] Cyber - 01 ~ 10 [1080p]/c1.mkv",
+                            "jp/Anime/[Grp] Cyber - 01 ~ 10 [1080p]/c1.mkv"]
+service.trigger_refresh = lambda: None
+a = str(tmp / "Anime/[Grp] Cyber - 01 ~ 10 [1080p]")
+b = str(tmp / "Anime/Cyber - Season 2")
+service.merge_shows([a, b], "Cyber", {a: 1, b: 2})
+assert (tmp / "Anime/Cyber/Season 1/c1.mkv").is_file() and (tmp / "Anime/Cyber/Season 2/c2.mkv").is_file()
+assert not os.path.exists(a) and not os.path.exists(b)
+assert linked("c1.mkv") == ["en/Anime/Cyber/Season 1/c1.mkv", "jp/Anime/Cyber/Season 1/c1.mkv"]
+assert linked("c2.mkv") == ["jp/Anime/Cyber/Season 2/c2.mkv"]
+assert str(tmp / "Anime/Cyber/Season 1/c1.mkv") in probe.load_db(), "cache se má přenést"
+c = str(tmp / "Anime/Cyber S03")
+try:
+    service.merge_shows([str(tmp / "Anime/Cyber"), c], "Cyber", {c: 2})
+    raise AssertionError("kolize sezón se má odmítnout")
+except library.PathError:
+    pass
+assert (tmp / "Anime/Cyber S03/c3.mkv").is_file(), "po odmítnutí se nic nesmí pohnout"
+service.merge_shows([str(tmp / "Anime/Cyber"), c], "Cyber", {c: 3})
+assert (tmp / "Anime/Cyber/Season 3/c3.mkv").is_file() and (tmp / "Anime/Cyber/Season 1/c1.mkv").is_file()
+assert sorter.run_once()["removed"] == 0, "sorter nemá po spojení nic uklízet"
+assert linked("c3.mkv") == ["en/Anime/Cyber/Season 3/c3.mkv"]
+
 cookie = auth.make_session()
 assert auth.session_valid(cookie)
 assert not auth.session_valid(cookie[:-1] + ("0" if cookie[-1] != "0" else "1"))

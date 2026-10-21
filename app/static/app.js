@@ -97,3 +97,11 @@ document.body.addEventListener('htmx:responseError', (e) =>
   toast(`Chyba serveru (HTTP ${e.detail.xhr.status}).`, 'error'));
 
 document.body.addEventListener('htmx:historyRestore', () => { closePanel(); closeModal(); });
+
+/* Filtr řádků v modalu (spojení show). */
+function filterList(input, selector) {
+  const needle = (input.value || '').trim().toLowerCase();
+  input.closest('form').querySelectorAll(selector).forEach((row) => {
+    row.classList.toggle('hide', !!needle && !(row.dataset.name || '').includes(needle));
+  });
+}

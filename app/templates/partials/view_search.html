@@ -1,0 +1,15 @@
+{# Výsledky globálního hledání přes Movies/Series/Anime. #}
+<div id="view" hx-get="/search?q={{ q|urlencode }}" hx-trigger="library-changed from:body"
+     hx-target="this" hx-swap="outerHTML">
+  {% if not q.strip() %}
+    <p class="none">Napiš, co hledáš — prohledá Movies, Series i Anime.</p>
+  {% elif not groups %}
+    <p class="none">Nic nenalezeno pro „{{ q }}“.</p>
+  {% endif %}
+  {% for key, items in groups.items() %}
+    <h3 class="group">{{ items[0].category|capitalize }} <span class="count">{{ items|length }}</span></h3>
+    <ul class="grid">
+      {% for item in items %}{% include "partials/tile.html" %}{% endfor %}
+    </ul>
+  {% endfor %}
+</div>

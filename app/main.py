@@ -33,6 +33,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.filters["human_size"] = service.human_size
+templates.env.filters["clean_name"] = library.clean_name
 templates.env.globals.update(LANGS=LANGS, LANG_LABELS=LANG_LABELS, TABS=TABS)
 
 
@@ -297,6 +298,43 @@ async def partial_auto_set(
     return templates.TemplateResponse(
         request, "partials/row_done.html",
         {"toast": {"kind": "ok", "message": f"{result['name']} → {where}"}},
+    )
+
+
+@app.get("/search", response_class=HTMLResponse, include_in_schema=False)
+async def page_search(request: Request, _: Auth, q: str = ""):
+    return _page(request, "index.html",
+                 {"active": "search", "q": q, "groups": library.search(q, overrides.load_all())},
+                 "partials/view_search.html")
+
+
+@app.get("/partial/merge", response_class=HTMLResponse, include_in_schema=False)
+async def partial_merge_modal(request: Request, _: Auth, path: str):
+    cat, p = library.locate(path)
+    current = library.show_root_of(cat, p)
+    shows = [s for s in library.top_level(cat) if s.is_dir()]
+    shows.sort(key=lambda s: s != current)   # aktuální nahoru, zbytek abecedně
+    rows = [{"path": str(s), "name": s.name, "checked": s == current,
+             "season": library.guess_season(s.name) or 1} for s in shows]
+    return templates.TemplateResponse(request, "partials/merge_modal.html", {
+        "cat": cat, "rows": rows, "name": library.show_base_name(current.name),
+    })
+
+
+@app.post("/partial/merge", response_class=HTMLResponse, include_in_schema=False)
+async def partial_merge(
+    request: Request, _: Auth,
+    name: Annotated[str, Form()],
+    paths: Annotated[list[str], Form()] = [],
+    all: Annotated[list[str], Form()] = [],
+    season: Annotated[list[int], Form()] = [],
+):
+    seasons = {p: n for p, n in zip(all, season) if p in paths}
+    result = service.merge_shows(paths, name, seasons)
+    toast = {"kind": "ok", "message": f"Spojeno do „{result['name']}“ ({result['count']} složky)"}
+    return templates.TemplateResponse(
+        request, "partials/deleted.html", {"toast": toast},
+        headers={"HX-Trigger": "library-changed"},
     )
 
 

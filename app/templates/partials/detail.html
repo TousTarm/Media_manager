@@ -4,7 +4,7 @@
   <section class="sheet" role="dialog" aria-modal="true" aria-label="Detail">
     <header class="sheet-head">
       <div>
-        <h2>{{ d.name }}</h2>
+        <h2 title="{{ d.name }}">{{ d.name|clean_name }}</h2>
         <p class="sheet-sub">
           {{ d.category.label }}
           {%- if d.kind == 'show' %} · {{ d.file_count }} epizod{% endif %}
@@ -73,6 +73,9 @@
                 hx-get="/b/{{ d.category.key }}?path={{ d.rel|urlencode }}"
                 hx-target="#view" hx-swap="outerHTML" hx-push-url="true"
                 onclick="closePanel()">Zobrazit sezóny a epizody</button>
+        <button class="btn" type="button"
+                hx-get="/partial/merge?path={{ d.abs_path|urlencode }}"
+                hx-target="#modal" hx-indicator="#spinner">Spojit s jinou složkou (další sezóna)</button>
       {% endif %}
 
       <button class="btn btn-del" type="button"

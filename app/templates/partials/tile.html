@@ -1,5 +1,5 @@
 {# Dlaždice v mřížce. Bez obrázků — nese ji název a stav jazyků. #}
-<li class="cell" data-name="{{ item.name|lower }}">
+<li class="cell" data-name="{{ item.name|lower }} {{ item.name|clean_name|lower }}">
   {% if item.action == 'detail' %}
     <button class="tile {% if item.unsorted %}tile-todo{% endif %}" type="button"
             hx-get="/partial/detail?path={{ item.abs_path|urlencode }}"
@@ -12,7 +12,7 @@
     <div class="tile tile-flat">
   {% endif %}
 
-      <span class="tile-name"><span>{{ item.name }}</span></span>
+      <span class="tile-name" title="{{ item.name }}"><span>{{ item.name|clean_name }}</span></span>
       <span class="tile-foot">
         {% if item.langs %}
           {% for lang in item.langs %}<b class="lang">{{ lang|upper }}</b>{% endfor %}

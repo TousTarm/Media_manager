@@ -123,6 +123,19 @@ def forget(paths: list[Path]) -> int:
     return int(mutate_json(get_settings().sorter_db, _apply) or 0)
 
 
+def move_prefix(old: Path, new: Path) -> int:
+    """Přejmenuje záznamy po přesunu složky, ať se nemusí měřit znovu."""
+    prefix = str(old).rstrip("/") + "/"
+
+    def _apply(db: dict):
+        hit = [k for k in db if k == str(old) or k.startswith(prefix)]
+        for k in hit:
+            db[str(new) + k[len(str(old)):]] = db.pop(k)
+        return len(hit) or False
+
+    return int(mutate_json(get_settings().sorter_db, _apply) or 0)
+
+
 def analyze(path: Path) -> list[str]:
     """Spustí ffprobe a rovnou uloží do cache."""
     langs = run_ffprobe(path)

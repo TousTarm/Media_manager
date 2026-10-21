@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -118,6 +119,32 @@ def subject_of(cat: Category, path: Path) -> Path:
 def override_key_for(cat: Category, path: Path) -> Path:
     """Klíč do `manual_overrides.json` — soubor u filmů, kořen show u seriálů."""
     return subject_of(cat, path)
+
+
+# Kde končí název a začínají technické údaje z torrentu.
+_TECH = re.compile(
+    r"(?i)[\s(\[-](?:\d{3,4}p|4k|uhd\w*|fhd|x26[45]|h ?26[45]|hevc|av1|blu-?ray|brrip|bdrip"
+    r"|bd|web-?dl|web-?rip|hdtv|hdrip|hdts|dvdrip|dvdscr|xvid|remux|remastered"
+    r"|(?:the )?complete|10-?bit|aac\w*|e?ac3|dts|multi\w*|dual[ -]?audio|yify|rarbg)\b"
+    r"|\s-\s\d{1,3}(?:\s|$)"          # „Show - 01 ~ 10“: číslo epizody
+)
+
+
+def clean_name(name: str) -> str:
+    """Krátký název pro UI: bez [skupiny], kvality, kodeku a přípony."""
+    stem = Path(name).stem if is_video(Path(name)) else name
+    s = re.sub(r"\[[^\]]*\]|\{[^}]*\}|^www\.\S+\s*-\s*", " ", stem.strip())
+    if " " not in s.strip() and s.count("-") > 1:
+        s = s.replace("-", " ")
+    if len(re.findall(r"[._+]", s)) > s.count(" "):
+        s = re.sub(r"[._+]", " ", s)
+    s = re.sub(r"\s[-_]+\s", " - ", s)
+    m = _TECH.search(s, 1)
+    if m:
+        s = s[:m.start()]
+    s = re.sub(r"\(\s*\)", " ", s)
+    s = re.sub(r"\s+", " ", s).strip(" -–_.,(")
+    return s or name
 
 
 def is_video(path: Path) -> bool:
@@ -369,25 +396,147 @@ def review_queue(overrides: dict[str, dict]) -> list[Item]:
     """
     out: list[Item] = []
     for cat in CATEGORIES.values():
-        root = source_root(cat)
-        if not root.is_dir():
-            continue
-        try:
-            entries = sorted(os.scandir(root), key=lambda e: e.name.casefold())
-        except OSError as exc:
-            log.warning("Nelze číst %s: %s", root, exc)
-            continue
-        for entry in entries:
-            if entry.name.startswith("."):
-                continue
-            path = Path(entry.path)
-            if not entry.is_dir(follow_symlinks=False) and not is_video(path):
-                continue
+        for path in top_level(cat):
             tile = _tile_for(cat, path, overrides)
             if tile is not None and tile.action == "detail" and not tile.has_override:
                 out.append(tile)
     out.sort(key=lambda i: i.mtime, reverse=True)
     return out
+
+
+def top_level(cat: Category) -> list[Path]:
+    """Položky na nejvyšší úrovni kategorie (filmy, složky filmů, show)."""
+    root = source_root(cat)
+    try:
+        entries = sorted(os.scandir(root), key=lambda e: e.name.casefold())
+    except OSError as exc:
+        log.warning("Nelze číst %s: %s", root, exc)
+        return []
+    return [Path(e.path) for e in entries
+            if not e.name.startswith(".")
+            and (e.is_dir(follow_symlinks=False) or is_video(Path(e.path)))]
+
+
+def search(query: str, overrides: dict[str, dict]) -> dict[str, list[Item]]:
+    """Hledání napříč Movies/Series/Anime v plném i zkráceném názvu."""
+    needle = query.casefold().strip()
+    out: dict[str, list[Item]] = {}
+    if not needle:
+        return out
+    for cat in CATEGORIES.values():
+        for path in top_level(cat):
+            if needle in path.name.casefold() or needle in clean_name(path.name).casefold():
+                tile = _tile_for(cat, path, overrides)
+                if tile is not None:
+                    out.setdefault(cat.key, []).append(tile)
+    return out
+
+
+# --------------------------------------------------------------------------
+# Spojení show (víc sezón v různých složkách -> jedna složka)
+# --------------------------------------------------------------------------
+
+_SEASON_DIR = re.compile(r"(?i)^season\s*\d+")
+
+
+def guess_season(name: str) -> int | None:
+    m = re.search(r"(?i)\b(?:season\s*|s)0*(\d{1,2})\b", name)
+    return int(m.group(1)) if m else None
+
+
+def show_base_name(name: str) -> str:
+    """Návrh názvu spojené složky: zkrácený název bez „Season 2“ / „S02“."""
+    base = re.sub(r"(?i)[\s-]*\b(?:season\s*\d+|s\d{1,2})\b.*$", "", clean_name(name))
+    return base.strip(" -") or clean_name(name)
+
+
+def _is_merged_show(path: Path) -> bool:
+    """Už má podsložky „Season N“ a žádné video přímo v sobě."""
+    children = list(path.iterdir())
+    return (any(c.is_dir() and _SEASON_DIR.match(c.name) for c in children)
+            and not any(c.is_file() and is_video(c) for c in children))
+
+
+def plan_merge(cat: Category, sources: list[Path], name: str,
+               seasons: dict[Path, int]) -> tuple[Path, list[tuple[Path, Path]]]:
+    """Ověří zadání a vrátí (cílová složka, [(odkud, kam relativně k cíli)])."""
+    root = source_root(cat)
+    name = name.strip()
+    if not name or "/" in name or name.startswith(".") or len(name) > 200:
+        raise PathError("Neplatný název složky")
+    if cat.kind != "show":
+        raise PathError("Spojovat jde jen seriály a anime")
+    if len(sources) < 2:
+        raise PathError("Vyber aspoň dvě složky")
+    for src in sources:
+        if src.parent != root or not src.is_dir():
+            raise PathError(f"Není to show v {cat.label}: {src}")
+    target = root / name
+    if target.exists() and target not in sources:
+        raise PathError(f"Složka „{name}“ už existuje — zaškrtni ji taky, ať se do ní přidá.")
+
+    moves: list[tuple[Path, Path]] = []
+    for src in sources:
+        if _is_merged_show(src):
+            moves += [(child, Path(child.name)) for child in sorted(src.iterdir())]
+        else:
+            if seasons.get(src) is None or seasons[src] < 0:
+                raise PathError(f"Chybí číslo sezóny u {src.name}")
+            moves.append((src, Path(f"Season {seasons[src]}")))
+    dests = [rel for _, rel in moves]
+    dupes = sorted({str(d) for d in dests if dests.count(d) > 1})
+    if dupes:
+        raise PathError(f"Dvě položky by skončily v „{dupes[0]}“ — uprav čísla sezón.")
+    return target, moves
+
+
+def execute_merge(cat: Category, sources: list[Path], name: str,
+                  seasons: dict[Path, int]) -> tuple[Path, list[tuple[Path, Path]]]:
+    """Přesune složky do jedné (rename v rámci disku, nic se nekopíruje).
+
+    Hardlinky v `sorted/` se přenesou se stejnými jazyky, jaké měly předtím.
+    Vrací cílovou složku a [(stará cesta, nová cesta)].
+    """
+    target, moves = plan_merge(cat, sources, name, seasons)
+    prev = {src: linked_langs(cat, src) for src, _ in moves}
+
+    tmp = source_root(cat) / f".merge-{os.getpid()}-{abs(hash(name))}"
+    tmp.mkdir()
+    done: list[tuple[Path, Path]] = []
+    try:
+        for src, rel in moves:
+            (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
+            os.rename(src, tmp / rel)
+            done.append((src, tmp / rel))
+        for src in sources:
+            if src.exists():
+                os.rmdir(src)          # prázdný obal po už spojené show
+        os.rename(tmp, target)
+    except OSError as exc:
+        for src, dest in reversed(done):
+            try:
+                src.parent.mkdir(parents=True, exist_ok=True)
+                os.rename(dest, src)
+            except OSError as back:
+                log.error("Vrácení %s -> %s selhalo: %s", dest, src, back)
+        try:
+            os.rmdir(tmp)
+        except OSError:
+            pass
+        raise PathError(f"Spojení selhalo, vráceno zpět: {exc}") from exc
+
+    moved = [(src, target / rel) for src, rel in moves]
+    for src in sources:
+        for lang in LANGS:
+            _unlink_mirror(cat, lang, src)
+    for src, new in moved:
+        for video in video_files_under(new):
+            for lang in prev[src]:
+                try:
+                    _link_one(video, mirror_path(cat, lang, video))
+                except OSError as exc:
+                    log.error("Nelze vytvořit hardlink pro %s: %s", video, exc)
+    return target, moved
 
 
 # --------------------------------------------------------------------------

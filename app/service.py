@@ -167,6 +167,35 @@ def delete_confirm(abs_path: str, token: str | None = None) -> dict:
     return result
 
 
+def merge_shows(paths: list[str], name: str, seasons: dict[str, int]) -> dict:
+    """Spojí víc složek jedné show do jedné (sezóny jako podsložky)."""
+    located = [library.locate(p) for p in paths]
+    cats = {cat.key for cat, _ in located}
+    if len(cats) != 1:
+        raise library.PathError("Spojovat jde jen složky ze stejné kategorie")
+    cat = located[0][0]
+    sources = [library.show_root_of(cat, p) for _, p in located]
+    by_src = {library.show_root_of(cat, library.locate(p)[1]): n for p, n in seasons.items()}
+
+    with sorter.lock:
+        old = overrides.load_all()
+        manual = [old[str(s)]["targets"] for s in sources if str(s) in old]
+        target, moved = library.execute_merge(cat, sources, name, by_src)
+        for src in sources:
+            overrides.clear_overrides_under(src)
+        for src, new in moved:
+            probe.move_prefix(src, new)
+        if manual:
+            # Aspoň jedna část měla ruční rozhodnutí — platí pro celou show (sjednocené).
+            union = overrides.normalize_targets([t for ts in manual for t in ts])
+            library.apply_targets(cat, target, union)
+            overrides.set_override(target, union)
+
+    log.info("Spojeno do %s: %s", target, ", ".join(s.name for s in sources))
+    trigger_refresh()
+    return {"name": target.name, "path": str(target), "count": len(sources)}
+
+
 def review_items() -> list[library.Item]:
     """Fronta na kontrolu + doplněné jazyky z ffprobe cache.
 

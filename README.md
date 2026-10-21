@@ -18,6 +18,15 @@ do horních tabů a bočního panelu.
 | **Anime** | Totéž co Series. |
 | **Sorter** | Poslední běh, co se změnilo, tlačítko *Spustit teď*. |
 
+Nahoře je hledání přes všechny tři složky naráz. Názvy se v UI zobrazují zkrácené
+(bez `[skupiny]`, kvality a kodeku); plný název je v tooltipu a v detailu u cesty.
+
+**Spojení sezón.** Když je jedna show ve dvou složkách (např. sezóna 1 a později
+stažená sezóna 2), Jellyfin je bere jako dvě show. V detailu show je tlačítko
+*Spojit s jinou složkou*: vybrané složky se přesunou (rename, nic se nekopíruje)
+do `Název/Season N`. Složka, která už `Season …` podsložky má, se jen doplní.
+Hardlinky v `sorted/`, ruční nastavení i cache ffprobe se přenesou.
+
 Jazyky jsou tři: **CZ**, **EN**, **JP** (`sorted/cz`, `sorted/en`, `sorted/jp`).
 Libovolná kombinace, včetně žádné — „nikam“ je platné rozhodnutí, ne absence
 rozhodnutí.

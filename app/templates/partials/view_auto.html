@@ -3,7 +3,7 @@
      hx-target="this" hx-swap="outerHTML">
 
   <div class="tools">
-    <input class="find" type="search" placeholder="Hledat" aria-label="Hledat"
+    <input class="find" type="search" placeholder="Filtrovat tady" aria-label="Filtrovat tady"
            autocomplete="off" spellcheck="false" oninput="filterView(this.value)">
     <span class="count">{{ items|length }}</span>
   </div>
@@ -19,7 +19,7 @@
 
   <ul class="rows" id="results">
     {% for item in items %}
-      <li class="cell" data-name="{{ item.name|lower }}">
+      <li class="cell" data-name="{{ item.name|lower }} {{ item.name|clean_name|lower }}">
         <form class="review {% if item.unsorted %}review-todo{% endif %}"
               hx-post="/partial/auto/set" hx-target="closest .cell"
               hx-swap="outerHTML" hx-indicator="#spinner">
@@ -28,7 +28,7 @@
           <div class="review-head">
             <button class="review-name" type="button"
                     hx-get="/partial/detail?path={{ item.abs_path|urlencode }}"
-                    hx-target="#panel" hx-indicator="#spinner">{{ item.name }}</button>
+                    hx-target="#panel" hx-indicator="#spinner" title="{{ item.name }}">{{ item.name|clean_name }}</button>
             <span class="review-cat">{{ item.category }}</span>
           </div>
 

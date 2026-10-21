@@ -4,7 +4,7 @@
 {% block body %}
 <header class="head">
   <div class="head-row">
-    <span class="head-title">Media Manager</span>
+    <a class="head-title" href="/">Media Manager</a>
     <a class="warn {% if not health.problems %}warn-ok{% elif health.failures %}warn-bad{% endif %}"
        href="/debug" hx-get="/debug" hx-target="#view" hx-swap="outerHTML" hx-push-url="true"
        title="Diagnostika prostředí">
@@ -16,6 +16,12 @@
     </a>
     <form method="post" action="/logout"><button class="mini" type="submit">Odhlásit</button></form>
   </div>
+  <form class="search-row" action="/search" method="get" role="search">
+    <input class="find" type="search" name="q" value="{{ q or '' }}" placeholder="Hledat ve všem (Movies, Series, Anime)"
+           aria-label="Hledat ve všem" autocomplete="off" spellcheck="false"
+           hx-get="/search" hx-trigger="input changed delay:250ms, search"
+           hx-target="#view" hx-swap="outerHTML" hx-replace-url="true" hx-indicator="#spinner">
+  </form>
   <nav class="tabs">
     {% for tab in TABS %}
       <a class="tab {% if tab.key == active %}on{% endif %}" href="{{ tab.href }}"
@@ -31,6 +37,7 @@
   {% if active == 'auto' %}{% include "partials/view_auto.html" %}
   {% elif active == 'debug' %}{% include "partials/view_debug.html" %}
   {% elif active == 'sorter' %}{% include "partials/view_sorter.html" %}
+  {% elif active == 'search' %}{% include "partials/view_search.html" %}
   {% else %}{% include "partials/view_browse.html" %}{% endif %}
 </main>
 
@@ -45,4 +52,5 @@
 <div id="modal"></div>
 <div id="toasts" aria-live="polite"></div>
 <div id="spinner" aria-hidden="true"></div>
+<div class="credit" aria-hidden="true">made by toust</div>
 {% endblock %}
