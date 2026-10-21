@@ -8,8 +8,7 @@ Hodnota: {"targets": ["cz"|"en", ...], "set_at": ISO8601 UTC}
 Prázdné `targets` = "nikam nedávat", což je platné rozhodnutí, ne absence
 override. Odstranění override se dělá přes `clear_override()`.
 
-Tento modul čte a zapisuje i `sorter.py` (přes `sorter_overrides.py`), formát
-proto nikdy neměň jednostranně.
+Čte ho i automatický sorter (`app/sorter.py`).
 """
 
 from __future__ import annotations

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Přihlášení · Media Manager{% endblock %}
+
+{% block body %}
+{#- Obyčejný formulář (žádné HTMX), aby ho správci hesel poznali a vyplnili. -#}
+<main class="login">
+  <form class="login-box" method="post" action="/login">
+    <h1 class="login-title">Media Manager</h1>
+    {% if error %}<p class="login-error" role="alert">{{ error }}</p>{% endif %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="login-field">
+      <span>Uživatel</span>
+      <input class="find" type="text" name="username" id="username" value="{{ username or '' }}"
+             autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    </label>
+    <label class="login-field">
+      <span>Heslo</span>
+      <input class="find" type="password" name="password" id="password"
+             autocomplete="current-password" required>
+    </label>
+    <button class="btn btn-go" type="submit">Přihlásit</button>
+  </form>
+</main>
+{% endblock %}

@@ -1,6 +1,6 @@
 """Atomické čtení/zápis JSON souborů sdílených se `sorter.py`.
 
-`sorter_db.json` i `manual_overrides.json` může současně číst cron. Každý zápis
+`sorter_db.json` i `manual_overrides.json` může současně číst sorter (vlákno na pozadí). Každý zápis
 proto jde přes tmp soubor + `os.replace()`, aby čtenář nikdy neviděl půlku
 souboru. Zápisy z aplikace navíc serializuje procesní zámek a vždy se dělá
 read-modify-write, aby se nepřepsalo, co mezitím zapsal sorter.

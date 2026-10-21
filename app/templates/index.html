@@ -14,6 +14,7 @@
       {%- elif health.problems %}varování
       {%- else %}vše ok{% endif -%}
     </a>
+    <form method="post" action="/logout"><button class="mini" type="submit">Odhlásit</button></form>
   </div>
   <nav class="tabs">
     {% for tab in TABS %}
@@ -29,6 +30,7 @@
 <main class="main" hx-history-elt>
   {% if active == 'auto' %}{% include "partials/view_auto.html" %}
   {% elif active == 'debug' %}{% include "partials/view_debug.html" %}
+  {% elif active == 'sorter' %}{% include "partials/view_sorter.html" %}
   {% else %}{% include "partials/view_browse.html" %}{% endif %}
 </main>
 

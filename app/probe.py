@@ -1,9 +1,7 @@
 """ffprobe wrapper + čtení/zápis cache `sorter_db.json`.
 
-Cache je primárně vlastnictví `sorter.py`; aplikace z ní jen čte, aby nemusela
-pouštět ffprobe při každém načtení stránky. Zapisuje do ní pouze při explicitní
-akci "Přeanalyzovat", a to ve stejném formátu `{mtime, langs, name}`, aby si
-cron výsledek nezahodil a neměřil to znovu.
+Plní ji sorter (`app/sorter.py`) a tlačítko „Přeanalyzovat“; stránky z ní jen
+čtou, aby se ffprobe nepouštěl při každém načtení. Formát `{mtime, langs, name}`.
 """
 
 from __future__ import annotations

@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout: int = 90
 
+    # --- automatické třídění (s mezi běhy, 0 = vypnuto)
+    sorter_interval: int = 60
+
     @field_validator("media_root", mode="before")
     @classmethod
     def _expand(cls, value):
@@ -88,10 +91,6 @@ class Settings(BaseSettings):
     @property
     def overrides_file(self) -> Path:
         return self.media_root / "manual_overrides.json"
-
-    @property
-    def sorter_script(self) -> Path:
-        return self.media_root / "sorter.py"
 
     @property
     def search_roots(self) -> list[Path]:
@@ -136,6 +135,7 @@ TABS: list[Tab] = [
     Tab("movies", "Movies", "/b/movies"),
     Tab("series", "Series", "/b/series"),
     Tab("anime", "Anime", "/b/anime"),
+    Tab("sorter", "Sorter", "/sorter"),
 ]
 
 # Jazykové větve v `sorted/`. Pořadí určuje pořadí přepínačů v UI.

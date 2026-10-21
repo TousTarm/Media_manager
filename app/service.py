@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import diagnostics, library, overrides, probe
+from . import diagnostics, library, overrides, probe, sorter
 from .config import Category, get_settings
 from .jellyfin import trigger_refresh
 
@@ -79,7 +79,9 @@ def get_detail(abs_path: str) -> Detail:
         detail.probe_langs = probe.entry_langs(entry)
         detail.probe_stale = not probe.entry_is_fresh(entry, probe_target)
         detail.probe_source = str(probe_target)
-        detail.auto_langs = probe.classify(detail.probe_langs)
+        if entry:
+            in_cz = library.mirror_path(cat, "cz", probe_target).exists()
+            detail.auto_langs = sorter.auto_targets(cat, detail.probe_langs, in_cz)
 
     return detail
 
@@ -102,8 +104,9 @@ def set_targets(abs_path: str, targets: list[str]) -> dict:
     subject = library.subject_of(cat, path)
     clean = overrides.normalize_targets(targets)
 
-    result = library.apply_targets(cat, subject, clean)
-    overrides.set_override(subject, clean)
+    with sorter.lock:
+        result = library.apply_targets(cat, subject, clean)
+        overrides.set_override(subject, clean)
     log.info(
         "Override uložen: %s -> %s (+%d linků, -%d linků)",
         subject, clean or ["(nikam)"], len(result["created"]), len(result["removed"]),
@@ -118,12 +121,13 @@ def confirm_auto(abs_path: str) -> dict:
     """„Automatika to trefila“ — uzamkne aktuální stav jako ruční rozhodnutí.
 
     Hardlinky se nemění, jen se stávající umístění zapíše do override store,
-    takže ho příští běh cronu nemůže přehodnotit.
+    takže ho příští běh sorteru nemůže přehodnotit.
     """
     cat, path = library.locate(abs_path)
     subject = library.subject_of(cat, path)
-    current = library.linked_langs(cat, subject)
-    overrides.set_override(subject, current)
+    with sorter.lock:
+        current = library.linked_langs(cat, subject)
+        overrides.set_override(subject, current)
     log.info("Potvrzeno automatické zařazení: %s -> %s", subject, current or ["(nikam)"])
     return {"path": str(subject), "targets": current, "name": subject.name}
 
@@ -132,7 +136,9 @@ def clear_target_override(abs_path: str) -> Detail:
     """Zruší ruční rozhodnutí — položka se vrátí pod kontrolu sorteru."""
     cat, path = library.locate(abs_path)
     subject = library.subject_of(cat, path)
-    if overrides.clear_override(subject):
+    with sorter.lock:
+        cleared = overrides.clear_override(subject)
+    if cleared:
         log.info("Override zrušen: %s", subject)
     return get_detail(str(subject))
 
@@ -150,9 +156,10 @@ def delete_confirm(abs_path: str, token: str | None = None) -> dict:
     subject = library.subject_of(cat, path)
     name = subject.name
 
-    result = library.execute_delete(cat, subject, token)
-    probe.forget([Path(p) for p in result["source_paths"]])
-    overrides.clear_overrides_under(subject)
+    with sorter.lock:
+        result = library.execute_delete(cat, subject, token)
+        probe.forget([Path(p) for p in result["source_paths"]])
+        overrides.clear_overrides_under(subject)
     log.info("Smazáno %s (%d souborů)", name, result["count"])
     trigger_refresh()
 
@@ -171,8 +178,13 @@ def review_items() -> list[library.Item]:
     for item in items:
         if not item.probe_path:
             continue
-        item.probe_langs = probe.entry_langs(probe.db_entry(db, item.probe_path))
-        item.auto_langs = probe.classify(item.probe_langs)
+        entry = probe.db_entry(db, item.probe_path)
+        if not entry:
+            continue
+        item.probe_langs = probe.entry_langs(entry)
+        cat = library.get_category(item.category)
+        in_cz = library.mirror_path(cat, "cz", Path(item.probe_path)).exists()
+        item.auto_langs = sorter.auto_targets(cat, item.probe_langs, in_cz)
     return items
 
 

@@ -3,7 +3,7 @@
 Smyslem není hezký report, ale chytit tiché chyby dřív, než si jich uživatel
 všimne podle toho, že „to nic neudělalo“: chybějící právo zápisu do knihovny,
 `sorted/` na jiném filesystému než `Movies/` (pak hardlinky skončí na EXDEV),
-nezaplacený `sorter.py` patch, chybějící ffprobe, mrtvý Jellyfin.
+starý sorter.py v cronu, chybějící ffprobe, mrtvý Jellyfin.
 
 Kontroly jsou **jen pro čtení a dočasné soubory**, které po sobě uklidí.
 Nikdy nesahají na skutečná média.
@@ -159,7 +159,7 @@ def _check_library(report: Report, writes: bool = True) -> None:
     if not sorted_root.is_dir():
         report.add(
             "sorted/", FAIL, "chybí",
-            f"Bez {sorted_root} nejde nic zařadit. Vytvoří ji sorter.py, "
+            f"Bez {sorted_root} nejde nic zařadit. Vytvoří ji sorter, "
             "nebo ji založ ručně.",
         )
         return
@@ -183,8 +183,7 @@ def _check_library(report: Report, writes: bool = True) -> None:
         report.add(
             "Jazykové větve", WARN, f"chybí {len(missing)}: {', '.join(missing[:6])}"
             + (" …" if len(missing) > 6 else ""),
-            "Nevadí — vytvoří se samy při prvním zařazení. Jen ověř, že sorter.py "
-            "je nesmaže (viz sorted/jp v SORTER_PATCH.md).",
+            "Nevadí — vytvoří se samy při prvním zařazení.",
         )
     else:
         report.add("Jazykové větve", OK, f"{len(LANGS) * len(CATEGORIES)} složek")
@@ -241,7 +240,7 @@ def _check_state_files(report: Report, writes: bool = True) -> None:
     if not db.is_file():
         report.add(
             "sorter_db.json", WARN, "neexistuje",
-            "Jazyky z ffprobe se nebudou předvyplňovat, dokud sorter.py "
+            "Jazyky z ffprobe se nebudou předvyplňovat, dokud sorter "
             "poprvé neproběhne. Tlačítko Přeanalyzovat funguje i tak.",
         )
     else:
@@ -270,40 +269,25 @@ def _check_state_files(report: Report, writes: bool = True) -> None:
             report.add("Zápis do MEDIA_ROOT", OK, "lze zapisovat")
 
 
+CRONTAB = Path("/var/spool/cron/crontabs/root")
+
+
 def _check_sorter(report: Report) -> None:
-    """Bez patche cron ruční rozhodnutí do 15 minut přepíše zpátky."""
-    settings = get_settings()
-    script = settings.sorter_script
-    helper = settings.media_root / "sorter_overrides.py"
-
-    if not script.is_file():
-        report.add(
-            "sorter.py", WARN, f"{script} nenalezen",
-            "Buď běží jinde, nebo tuhle knihovnu neřídí cron. Pokud řídí, "
-            "musí být upravený podle SORTER_PATCH.md.",
-        )
-        return
-
+    """Sorter běží v appce; starý cron skript by si s ním přetahoval linky."""
     try:
-        source = script.read_text(encoding="utf-8", errors="replace")
-    except OSError as exc:
-        report.add("sorter.py", WARN, f"nelze přečíst: {exc}")
-        return
-
-    patched = "sorter_overrides" in source or "manual_overrides" in source
-    if not patched:
+        in_cron = "sorter.py" in CRONTAB.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        in_cron = False
+    interval = get_settings().sorter_interval
+    if in_cron:
         report.add(
-            "sorter.py patch", FAIL, "override mechanismus tam není",
-            "Cron přepíše každé ruční rozhodnutí při dalším běhu. "
-            "Postup je v SORTER_PATCH.md.",
+            "Sorter", FAIL, "starý sorter.py je pořád v cronu",
+            "Dva sortery by si přetahovaly linky. Smaž ten řádek přes crontab -e.",
         )
-    elif not helper.is_file():
-        report.add(
-            "sorter.py patch", FAIL, f"sorter.py na override odkazuje, ale {helper} chybí",
-            "Zkopíruj sorter_overrides.py vedle sorter.py, jinak cron spadne na ImportError.",
-        )
+    elif interval <= 0:
+        report.add("Sorter", WARN, "automatický běh vypnutý (SORTER_INTERVAL=0)")
     else:
-        report.add("sorter.py patch", OK, "override mechanismus je na místě")
+        report.add("Sorter", OK, f"běží v appce každých {interval} s")
 
 
 def _check_ffprobe(report: Report) -> None:

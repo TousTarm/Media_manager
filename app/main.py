@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from . import diagnostics, library, overrides, service
-from .auth import Auth
+from . import auth, diagnostics, library, overrides, service, sorter
+from .auth import Auth, LoginRequired
 from .config import LANG_LABELS, LANGS, TABS, Category, get_settings
+from .jellyfin import trigger_refresh
 from .library import PathError
 
 logging.basicConfig(
@@ -45,11 +47,41 @@ async def _startup() -> None:
     # Síťovou kontrolu Jellyfinu při startu vynecháme, ať se běh nezdrží,
     # když je zrovna dole; na /debug se dělá kompletní.
     diagnostics.log_report(diagnostics.run_checks(include_network=False, include_writes=True))
+    if settings.sorter_interval > 0:
+        app.state.sorter_task = asyncio.create_task(_sorter_loop(settings.sorter_interval))
+    else:
+        log.warning("SORTER_INTERVAL=0 — automatické třídění je vypnuté")
+
+
+async def _run_sorter() -> dict:
+    stats = await asyncio.to_thread(sorter.run_once)
+    if stats.get("created") or stats.get("removed"):
+        trigger_refresh()
+    return stats
+
+
+async def _sorter_loop(interval: int) -> None:
+    while True:
+        try:
+            await _run_sorter()
+        except Exception:  # noqa: BLE001 — smyčka nesmí umřít kvůli jednomu běhu
+            log.exception("Běh sorteru spadl")
+        await asyncio.sleep(interval)
 
 
 # --------------------------------------------------------------------------
 # Chyby
 # --------------------------------------------------------------------------
+
+@app.exception_handler(LoginRequired)
+async def _login_required(request: Request, exc: LoginRequired):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Nepřihlášen"}, status_code=401)
+    if request.headers.get("HX-Request"):
+        # HTMX by redirect jen tiše vložil do stránky; tohle přesměruje celé okno.
+        return Response(status_code=200, headers={"HX-Redirect": "/login"})
+    target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+    return RedirectResponse(f"/login?next={quote(target)}", status_code=303)
 
 @app.exception_handler(PathError)
 async def _path_error(request: Request, exc: PathError):
@@ -98,6 +130,51 @@ async def healthz():
     return {"status": "ok"}
 
 
+def _safe_next(target: str) -> str:
+    # Jen cesta v rámci appky — žádný open redirect na cizí doménu.
+    if not target.startswith("/") or target.startswith(("//", "/\\")):
+        return "/"
+    return target
+
+
+@app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+async def login_page(request: Request, next: str = "/"):
+    if auth.session_valid(request.cookies.get(auth.COOKIE)):
+        return RedirectResponse(_safe_next(next), status_code=303)
+    return templates.TemplateResponse(request, "login.html", {"next": _safe_next(next)})
+
+
+@app.post("/login", include_in_schema=False)
+async def login_submit(
+    request: Request,
+    username: Annotated[str, Form()] = "",
+    password: Annotated[str, Form()] = "",
+    next: Annotated[str, Form()] = "/",
+):
+    if not auth.check_credentials(username, password):
+        log.warning("Neúspěšné přihlášení (%s) z %s", username,
+                    request.client.host if request.client else "?")
+        await asyncio.sleep(1)   # brzda proti hádání hesla
+        return templates.TemplateResponse(
+            request, "login.html",
+            {"next": _safe_next(next), "error": "Špatné jméno nebo heslo.", "username": username},
+            status_code=401,
+        )
+    resp = RedirectResponse(_safe_next(next), status_code=303)
+    resp.set_cookie(
+        auth.COOKIE, auth.make_session(), max_age=auth.MAX_AGE, httponly=True,
+        samesite="lax", secure=request.url.scheme == "https",
+    )
+    return resp
+
+
+@app.post("/logout", include_in_schema=False)
+async def logout():
+    resp = RedirectResponse("/login", status_code=303)
+    resp.delete_cookie(auth.COOKIE)
+    return resp
+
+
 @app.get("/b/{category}", response_class=HTMLResponse, include_in_schema=False)
 async def page_browse(request: Request, _: Auth, category: str, path: str = ""):
     cat = library.get_category(category)
@@ -134,6 +211,28 @@ async def page_debug(request: Request, _: Auth):
     return _page(request, "index.html",
                  {"report": report, "active": "debug"},
                  "partials/view_debug.html")
+
+
+@app.get("/sorter", response_class=HTMLResponse, include_in_schema=False)
+async def page_sorter(request: Request, _: Auth):
+    return _page(request, "index.html", {"active": "sorter", **_sorter_ctx()},
+                 "partials/view_sorter.html")
+
+
+@app.post("/sorter/run", response_class=HTMLResponse, include_in_schema=False)
+async def sorter_run(request: Request, _: Auth):
+    stats = await _run_sorter()
+    toast = ({"kind": "error", "message": "Sorter už právě běží."} if stats.get("busy")
+             else {"kind": "ok", "message": f"Hotovo: +{stats['created']} / -{stats['removed']} linků"})
+    return templates.TemplateResponse(
+        request, "partials/view_sorter.html", {**_sorter_ctx(), "toast": toast},
+        headers={"HX-Trigger": "library-changed"} if not stats.get("busy") else None,
+    )
+
+
+def _sorter_ctx() -> dict:
+    return {"last": sorter.last_run, "events": list(sorter.events),
+            "interval": get_settings().sorter_interval}
 
 
 @app.get("/partial/detail", response_class=HTMLResponse, include_in_schema=False)
@@ -340,3 +439,9 @@ async def api_debug(_: Auth):
 @app.get("/api/overrides")
 async def api_overrides(_: Auth):
     return overrides.load_all()
+
+
+@app.get("/api/sorter")
+async def api_sorter(_: Auth):
+    return {"interval": get_settings().sorter_interval, "last_run": sorter.last_run,
+            "events": [{"time": t, "level": lvl, "message": m} for t, lvl, m in sorter.events]}

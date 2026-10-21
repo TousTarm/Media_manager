@@ -1,0 +1,38 @@
+{# Stav automatického třídění: poslední běh, události, ruční spuštění. #}
+{% if toast %}{% include "partials/toast_oob.html" %}{% endif %}
+<div id="view">
+  <div class="tools">
+    <span class="crumb-now">Sorter</span>
+    <button class="mini mini-ok" style="margin-left:auto" type="button"
+            hx-post="/sorter/run" hx-target="#view" hx-swap="outerHTML"
+            hx-indicator="#spinner">Spustit teď</button>
+  </div>
+
+  <p class="lead">
+    {% if interval > 0 %}Běží automaticky každých <b>{{ interval }} s</b>.
+    {% else %}<b>Automatický běh je vypnutý</b> (SORTER_INTERVAL=0).{% endif %}
+    {% if last.finished %}
+      Poslední běh {{ last.finished }} ({{ last.seconds }} s):
+      +{{ last.created }} / −{{ last.removed }} linků, změřeno {{ last.probed }}
+      {%- if last.settling %}, {{ last.settling }} se ještě stahuje{% endif %}
+      {%- if last.errors %}, <b>{{ last.errors }} chyb</b>{% endif %}.
+    {% else %}
+      Od startu služby ještě neproběhl.
+    {% endif %}
+  </p>
+
+  {% if not events %}
+    <p class="none">Zatím žádné události. Zapisuje se jen to, co se změnilo.</p>
+  {% endif %}
+
+  <ul class="rows">
+    {% for time, level, message in events %}
+      <li class="ev {% if level == 'warn' %}ev-warn{% endif %}">
+        <span class="ev-time">{{ time }}</span>
+        <span class="ev-msg">{{ message }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p class="foot-note">Události se drží jen do restartu služby. Celá historie: <code>journalctl -u media-manager</code>.</p>
+</div>

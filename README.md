@@ -1,15 +1,14 @@
 # Media Manager
 
-Ruční korekce jazykové klasifikace Jellyfin knihovny. `sorter.py` (cron, každých
-15 min) rozhoduje automaticky podle ffprobe; tahle appka je nástroj pro případy,
-kdy se splete — a hlavně zajistí, že další běh cronu ruční rozhodnutí
-**nepřepíše zpátky**.
+Třídění Jellyfin knihovny podle jazyka audio stop do `sorted/{cz,en,jp}` (hardlinky).
+Automatický sorter běží uvnitř služby (každých `SORTER_INTERVAL` s) a appka k němu
+přidává ruční opravy, které sorter **nepřepíše**.
 
 Mobile-first: spodní navigační lišta, bottom sheet místo modálů, dotykové cíle
 ≥ 44 px, mazání na podržení místo náhodného tapu. Na desktopu se totéž rozloží
 do horních tabů a bočního panelu.
 
-## Čtyři taby
+## Taby
 
 | Tab | Co v něm je |
 | --- | --- |
@@ -17,6 +16,7 @@ do horních tabů a bočního panelu.
 | **Movies** | Mřížka filmů. Složka s jedním videem = jedna dlaždice; klasifikace stejně míří na soubor uvnitř. |
 | **Series** | Mřížka seriálů. Dlaždice = kořenová složka show, dovnitř se dá nahlédnout, ale jazyk se nastavuje za celou show. |
 | **Anime** | Totéž co Series. |
+| **Sorter** | Poslední běh, co se změnilo, tlačítko *Spustit teď*. |
 
 Jazyky jsou tři: **CZ**, **EN**, **JP** (`sorted/cz`, `sorted/en`, `sorted/jp`).
 Libovolná kombinace, včetně žádné — „nikam“ je platné rozhodnutí, ne absence
@@ -41,13 +41,14 @@ systemctl daemon-reload && systemctl enable --now media-manager
 systemctl status media-manager
 ```
 
-Pak `http://<server-ip>:8181`, přihlášení `APP_USER` + `APP_PASSWORD`.
+Pak `http://<server-ip>:8181`, přihlášení formulářem (`APP_USER` + `APP_PASSWORD`),
+session cookie platí 30 dní. Změna hesla odhlásí všechna zařízení.
 
 Po startu appka projede prostředí a co nesedí, napíše do logu
 (`journalctl -u media-manager`). Kompletní obraz je na **`/debug`** — odkaz je
 i vpravo nahoře v hlavičce. Kontroluje se právo zápisu do knihovny, jestli
 `sorted/` leží na stejném filesystému jako `Movies/` (jinak hardlinky skončí
-na EXDEV), jestli je `sorter.py` opatchovaný, dostupnost ffprobe a Jellyfinu.
+na EXDEV), jestli v cronu nezůstal starý `sorter.py`, dostupnost ffprobe a Jellyfinu.
 Testy zápisu vytvoří dočasný soubor a hned ho smažou.
 
 ## Konfigurace
@@ -62,7 +63,8 @@ V kódu není žádná natvrdo zadaná cesta ani heslo — vzor je `.env.example
 | `JELLYFIN_URL` | `http://127.0.0.1:8096` | základ pro `/Library/Refresh` |
 | `JELLYFIN_API_KEY` | — | prázdné = refresh se přeskočí, zbytek funguje |
 | `JELLYFIN_TIMEOUT` | `10` | s |
-| `APP_USER` / `APP_PASSWORD` | `admin` / — | HTTP Basic; bez hesla appka odmítne vše |
+| `APP_USER` / `APP_PASSWORD` | `admin` / — | login stránka; bez hesla appka odmítne vše |
+| `SORTER_INTERVAL` | `60` | s mezi běhy sorteru, `0` = vypnuto |
 | `APP_HOST` / `APP_PORT` | `0.0.0.0` / `8181` | kde poslouchat |
 | `LOG_LEVEL` | `INFO` | |
 | `FFPROBE_PATH` / `FFPROBE_TIMEOUT` | `ffprobe` / `90` | |
@@ -70,11 +72,33 @@ V kódu není žádná natvrdo zadaná cesta ani heslo — vzor je `.env.example
 Systemd unit spouští `python -m app.run`, ne `uvicorn` s parametry — jinak by
 `APP_HOST`, `APP_PORT` a `LOG_LEVEL` v `.env` byly jen dekorace.
 
-## Nutný krok: úprava `sorter.py`
+## Aktualizace na serveru
 
-Bez ní appka funguje, ale cron ruční rozhodnutí za 15 minut přepíše zpátky.
-Postup je v [SORTER_PATCH.md](SORTER_PATCH.md) — nakopírovat
-`sorter_overrides.py` vedle `sorter.py` a přidat do něj tři kusy kódu.
+```bash
+git archive HEAD | ssh root@<proxmox-host> "pct exec 102 -- tar -x -C /opt/media-manager" \
+  && ssh root@<proxmox-host> "pct exec 102 -- systemctl restart media-manager"
+```
+
+`.env` a `venv/` nejsou v repu, takže je to nepřepíše. Smazané soubory na
+serveru zůstanou ležet — nevadí, appka je nenačítá. Když se změní
+`requirements.txt`, ještě `venv/bin/pip install -r requirements.txt`.
+
+## Sorter
+
+`app/sorter.py`, náhrada za původní cron skript `/media/jellyfin/sorter.py`.
+
+- Ruční override vyhrává, ffprobe se pro něj nespouští.
+- Film/seriál: CZ stopa → CZ, EN stopa → EN (obojí = obě knihovny), nic → EN.
+  Co někdo ručně vložil do `sorted/cz` a CZ stopu nemá, zůstane jen v CZ.
+- Anime: JP stopa → JP, EN stopa nebo nic → EN.
+- U seriálů rozhoduje každá složka s videi zvlášť podle svého největšího souboru.
+- Soubor změněný před < 2 min se ještě stahuje: linky se nechají být, ffprobe počká.
+- Co v `sorted/{lang}/{Kategorie}` nikam nepatří, smaže. Když chybí zdrojová
+  složka (odpojený mount), její větev neuklízí.
+- Do logu píše jen změny. Měření ffprobem běží mimo zámek, linkování a úklid
+  pod zámkem sdíleným s ručními zásahy z UI.
+
+Samotest: `venv/bin/python -m tests.test_sorter` (běží na dočasné knihovně).
 
 ## Jak to uvnitř funguje
 
@@ -86,11 +110,11 @@ umístění hardlinků nevypovídá.
 **Klíčování override.** U filmu je klíčem přesná cesta k souboru, u seriálu a
 anime kořenová složka show. Tapneš-li v appce na epizodu, detail i override se
 stejně vztáhnou na celou show; sorter si stejný klíč odvodí ze své sample cesty
-přes `sorter_overrides.show_root()`.
+přes `library.show_root_of()`.
 
 **Auto tab a co znamená „potvrdit“.** Seznam drží položky bez override, tedy
-to, co pořád řídí cron. Potvrzení zapíše aktuální (nebo tebou upravený) stav do
-override store — od té chvíle je rozhodnutí tvoje a cron ho nesahá. Proto
+to, co pořád řídí sorter. Potvrzení zapíše aktuální (nebo tebou upravený) stav do
+override store — od té chvíle je rozhodnutí tvoje a sorter na něj nesahá. Proto
 položka ze seznamu zmizí: fronta se tím vyprazdňuje.
 
 **Prázdné `targets` není totéž co žádný override.** `[]` znamená „nikam
@@ -110,7 +134,7 @@ nespadne.
 
 ## API
 
-Vedle HTML je k dispozici JSON API (stejné Basic Auth):
+Vedle HTML je k dispozici JSON API (stejná session cookie, bez ní 401):
 
 | Endpoint | Co dělá |
 | --- | --- |
@@ -124,6 +148,7 @@ Vedle HTML je k dispozici JSON API (stejné Basic Auth):
 | `POST /api/item/delete/confirm` | skutečné smazání (bere `token` z dry-runu) |
 | `GET /api/overrides` | celý override store |
 | `GET /api/debug` | výsledek kontroly prostředí |
+| `GET /api/sorter` | poslední běh sorteru a události |
 | `GET /healthz` | jediná route bez auth; vrací pouze `{"status":"ok"}` |
 
 Mazání je záměrně na dva requesty: frontend nejdřív ukáže seznam, teprve pak
@@ -143,9 +168,10 @@ app/
   probe.py      ffprobe + sorter_db.json
   jellyfin.py   fire-and-forget refresh
   jsonstore.py  atomické čtení/zápis JSON sdílených se sorterem
-  auth.py       HTTP Basic
+  auth.py       login formulář + podepsaná session cookie
+  sorter.py     automatické třídění (běží na pozadí ve službě)
   diagnostics.py kontrola prostředí pro /debug a start
   run.py        spouštěč, aby APP_HOST/APP_PORT/LOG_LEVEL platily
   config.py     .env -> Settings
-sorter_overrides.py   helper k nakopírování vedle sorter.py (stdlib only)
+tests/test_sorter.py  samotest sorteru a přihlášení
 ```
